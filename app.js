@@ -459,15 +459,15 @@
       el.startBtn.disabled = true;
       await engine.start();
       await engine.resume();
-      bandLoNorm = hzToNorm(2000);
-      bandHiNorm = hzToNorm(8000);
-      setActivePreset(null);
+      // Keep mode / preset / process choices made before Start
       applyBandToEngine();
       engine.setMonitorGain(Number(el.gainSlider.value));
       if (mode !== "band" && mode !== "direct") mode = "band";
       setMode(mode);
       engine.setMonitorEnabled(true);
       engine.setMode(mode);
+      engine.setDeHiss(engine.deHissOn);
+      engine.setRumble(engine.rumbleOn);
 
       el.startBtn.textContent = "Stop";
       el.startBtn.dataset.state = "on";
@@ -475,14 +475,12 @@
       el.status.textContent = "Live";
       el.status.dataset.state = "live";
       el.hint.textContent =
-        "Drag HI/LO to set range · drag yellow line / anywhere to slide the band";
-      el.modeBand.disabled = false;
-      if (el.modeDirect) el.modeDirect.disabled = false;
+        mode === "direct"
+          ? "Full unfiltered mic in headphones"
+          : "Drag HI/LO to set range · drag yellow line / anywhere to slide the band";
       el.gainSlider.disabled = false;
-      setProcessBtn(el.btnDeHiss, engine.deHissOn);
-      setProcessBtn(el.btnRumble, engine.rumbleOn);
-      if (el.btnDeHiss) el.btnDeHiss.disabled = false;
-      if (el.btnRumble) el.btnRumble.disabled = false;
+      setToggleBtn(el.btnDeHiss, engine.deHissOn);
+      setToggleBtn(el.btnRumble, engine.rumbleOn);
 
       runningVisual = true;
       ensureBuffers();
@@ -508,17 +506,8 @@
     el.status.textContent = "Mic off";
     el.status.dataset.state = "";
     el.hint.textContent = "Headphones in · tap Start mic to listen and see the spectrum";
-    el.modeBand.disabled = true;
-    if (el.modeDirect) el.modeDirect.disabled = true;
     el.gainSlider.disabled = true;
-    if (el.btnDeHiss) {
-      el.btnDeHiss.disabled = true;
-      setProcessBtn(el.btnDeHiss, false);
-    }
-    if (el.btnRumble) {
-      el.btnRumble.disabled = true;
-      setProcessBtn(el.btnRumble, false);
-    }
+    // Keep Band/Full/presets/De-hiss/Rumble lit & selected for next Start
     // Clear canvas
     if (el.canvas) {
       const ctx = el.canvas.getContext("2d");
@@ -617,7 +606,6 @@
     });
 
     el.btnDeHiss?.addEventListener("click", () => {
-      if (!engine.running) return;
       engine.setDeHiss(!engine.deHissOn);
       setToggleBtn(el.btnDeHiss, engine.deHissOn);
       el.hint.textContent = engine.deHissOn
@@ -625,7 +613,6 @@
         : "De-hiss off";
     });
     el.btnRumble?.addEventListener("click", () => {
-      if (!engine.running) return;
       engine.setRumble(!engine.rumbleOn);
       setToggleBtn(el.btnRumble, engine.rumbleOn);
       el.hint.textContent = engine.rumbleOn
@@ -658,11 +645,9 @@
 
     setMode("band");
     setActivePreset(null);
-    el.modeBand.disabled = true;
-    if (el.modeDirect) el.modeDirect.disabled = true;
+    setToggleBtn(el.btnDeHiss, engine.deHissOn);
+    setToggleBtn(el.btnRumble, engine.rumbleOn);
     el.gainSlider.disabled = true;
-    if (el.btnDeHiss) el.btnDeHiss.disabled = true;
-    if (el.btnRumble) el.btnRumble.disabled = true;
 
     // Fit-to-screen
     function showApp() {
