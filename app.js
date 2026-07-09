@@ -578,7 +578,8 @@
     el.startBtn.dataset.state = "off";
     el.status.textContent = "Mic off";
     el.status.dataset.state = "";
-    el.hint.textContent = "Wired headphones on. Start mic to isolate spectrum";
+    el.hint.innerHTML =
+      '<span class="hint-white">Wired headphones</span> on. Start mic to isolate spectrum';
     el.gainSlider.disabled = true;
     setControlsLive(false);
     resetBandTo420();
