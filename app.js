@@ -253,26 +253,32 @@
       ctx.fillText(label, 6, y);
     }
 
-    // Band region (shown whenever band listening is active)
-    const yHi = normToY(bandHiNorm(), H);
-    const yLo = normToY(bandLoNorm(), H);
-    const top = Math.min(yHi, yLo);
-    const bot = Math.max(yHi, yLo);
-    const mid = (top + bot) / 2;
-    const sliding = dragging === "band";
+    // Selection highlight: band portion, or full spectrum in Full mode
+    const bandLive = engine.running;
+    const fillIdle = "rgba(61,156,245,0.10)";
+    const fillLive = "rgba(61,156,245,0.18)";
+    const fillSlide = "rgba(61,156,245,0.24)";
+    const strokeLive = "rgba(61,156,245,0.95)";
+    const strokeIdle = "rgba(61,156,245,0.55)";
 
-    if (mode === "band") {
-      const bandLive = engine.running;
-      ctx.fillStyle = bandLive
-        ? sliding
-          ? "rgba(61,156,245,0.24)"
-          : "rgba(61,156,245,0.18)"
-        : "rgba(61,156,245,0.10)";
+    if (mode === "direct") {
+      ctx.fillStyle = bandLive ? fillLive : fillIdle;
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = bandLive ? strokeLive : strokeIdle;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, W - 2, H - 2);
+    } else if (mode === "band") {
+      const yHi = normToY(bandHiNorm(), H);
+      const yLo = normToY(bandLoNorm(), H);
+      const top = Math.min(yHi, yLo);
+      const bot = Math.max(yHi, yLo);
+      const mid = (top + bot) / 2;
+      const sliding = dragging === "band";
+
+      ctx.fillStyle = bandLive ? (sliding ? fillSlide : fillLive) : fillIdle;
       ctx.fillRect(0, top, W, bot - top);
 
-      ctx.strokeStyle = bandLive
-        ? "rgba(61,156,245,0.95)"
-        : "rgba(61,156,245,0.55)";
+      ctx.strokeStyle = bandLive ? strokeLive : strokeIdle;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, top);
@@ -562,6 +568,7 @@
       ctx.fillStyle = "#080c14";
       ctx.fillRect(0, 0, el.canvas.width, el.canvas.height);
     }
+    ensureBuffers();
     drawOverlay();
   }
 
