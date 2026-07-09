@@ -7,9 +7,27 @@
 
   const MIN_HZ = 20;
   const DEFAULT_BAND_Q = 0.707;
+  /** Fixed mic preamp — same on phone/Mac */
+  const PREAMP_DEFAULT = 4;
+  /**
+   * iPad mics / Web Audio path often quieter with same headphones.
+   * Boost only on iPad so phone/Mac stay as-is.
+   */
+  const PREAMP_IPAD = 7;
 
   function clamp(v, lo, hi) {
     return Math.max(lo, Math.min(hi, v));
+  }
+
+  function isIPad() {
+    if (typeof navigator === "undefined") return false;
+    const ua = navigator.userAgent || "";
+    if (/iPad/i.test(ua)) return true;
+    // iPadOS 13+ can report as MacIntel with touch
+    if (navigator.platform === "MacIntel" && (navigator.maxTouchPoints || 0) > 1) {
+      return true;
+    }
+    return false;
   }
 
   class AudioEngine {
@@ -105,8 +123,10 @@
       analyser.maxDecibels = -22;
 
       const inputGain = ctx.createGain();
-      // Fixed mic preamp (no UI slider) — room/ambient levels are much quieter than close speech
-      inputGain.gain.value = 4;
+      // Fixed mic preamp (no UI slider). iPad gets a higher fixed gain (see PREAMP_*).
+      const preamp = isIPad() ? PREAMP_IPAD : PREAMP_DEFAULT;
+      inputGain.gain.value = preamp;
+      this._preamp = preamp;
 
       const effectSlot = ctx.createGain();
       effectSlot.gain.value = 1;
