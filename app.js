@@ -14,9 +14,13 @@
   let spectroH = 0;
   let imageData = null;
 
+  // Default band: geometric center = 420 Hz (210–840 Hz)
+  const DEFAULT_BAND_LO_HZ = 210;
+  const DEFAULT_BAND_HI_HZ = 840;
+
   // Interaction
-  let bandLoNorm = 0.55; // 0 bottom … 1 top in log-freq space
-  let bandHiNorm = 0.82;
+  let bandLoNorm = hzToNorm(DEFAULT_BAND_LO_HZ); // 0 bottom … 1 top in log-freq space
+  let bandHiNorm = hzToNorm(DEFAULT_BAND_HI_HZ);
   let dragging = null; // 'lo' | 'hi' | 'band' | null
   let dragStartY = 0;
   let dragStartLo = 0;

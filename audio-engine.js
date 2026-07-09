@@ -32,8 +32,8 @@
       this.effectSlot = null;
       this.running = false;
       this.mode = "off"; // off | band | direct
-      this.bandLowHz = 2000;
-      this.bandHighHz = 8000;
+      this.bandLowHz = 210; // default focus ~420 Hz geometric center
+      this.bandHighHz = 840;
       this._monitorOn = false;
       this._savedMonitorGain = 1.4;
       this._rumbleOn = false;
