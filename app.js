@@ -437,11 +437,16 @@
     ctx.fillText(which === "hi" ? "HI" : "LO", x, y);
   }
 
+  /** While true, skip spectrogram draws — stops rotate flutter while Live. */
+  let phoneRotateFrozen = false;
+
   function tick() {
     if (!runningVisual) return;
-    drawColumn();
-    drawOverlay();
-    updateReadouts();
+    if (!phoneRotateFrozen) {
+      drawColumn();
+      drawOverlay();
+      updateReadouts();
+    }
     raf = requestAnimationFrame(tick);
   }
 
@@ -902,6 +907,20 @@
       app.dataset.layout = "phone";
     }
 
+    let phoneLayoutReady = false;
+    let orientSettleTimer = 0;
+
+    function isPhoneUi() {
+      return Math.min(window.innerWidth, window.innerHeight) <= 520;
+    }
+
+    function settlePhoneAfterRotate() {
+      phoneRotateFrozen = false;
+      pinPhoneFill();
+      ensureBuffers();
+      drawOverlay();
+    }
+
     const fit = FitToScreen.create({
       stage: "fit-stage",
       app: "app",
@@ -911,20 +930,35 @@
       // Phone: fluid full-height (no scale gap under controls). Desktop/iPad: scale.
       useScaleForLayout: (layout) => layout !== "phone",
       onFit: () => {
+        // Phone: ignore mid-rotate fit ticks (they rebuild the canvas → jitter)
+        if (isPhoneUi()) {
+          if (!phoneLayoutReady) {
+            pinPhoneFill();
+            showApp();
+            ensureBuffers();
+            drawOverlay();
+            phoneLayoutReady = true;
+          }
+          return;
+        }
         pinPhoneFill();
         showApp();
         ensureBuffers();
         drawOverlay();
       },
     });
-    // Phone fluid stage not rewritten by fit-to-screen's visualViewport sizes
-    fit.bindViewportListeners({ bindOrientation: false });
 
-    // Open: edge-fill once (no height number that can be short)
+    // Desktop/iPad only — phone must not re-run fit on every resize during rotate
+    if (!isPhoneUi()) {
+      fit.bindViewportListeners();
+    }
+
+    // Open: edge-fill once
     pinPhoneFill();
     showApp();
     ensureBuffers();
     drawOverlay();
+    phoneLayoutReady = isPhoneUi();
 
     fit.bootLayout()
       .then(() => {
@@ -932,19 +966,30 @@
         showApp();
         ensureBuffers();
         drawOverlay();
+        phoneLayoutReady = true;
       })
       .catch(() => {
         pinPhoneFill();
         showApp();
+        phoneLayoutReady = true;
       });
 
-    // Desktop/iPad only re-pin on resize. Phone stays edge-anchored (no rotate thrash).
     window.addEventListener("resize", () => {
-      if (window.innerWidth > 767) {
+      if (!isPhoneUi()) {
         pinPhoneFill();
         ensureBuffers();
         drawOverlay();
       }
+      // Phone: ignore resize storms (orientation) — handled below once
+    });
+
+    window.addEventListener("orientationchange", () => {
+      if (!isPhoneUi() && window.innerWidth > 767) return;
+      // Freeze live spectrogram draws immediately (no mad flutter)
+      phoneRotateFrozen = true;
+      clearTimeout(orientSettleTimer);
+      // One settle after iOS finishes — not on every intermediate size
+      orientSettleTimer = setTimeout(settlePhoneAfterRotate, 650);
     });
 
     window.addEventListener("pagehide", () => {
