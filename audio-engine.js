@@ -323,7 +323,10 @@
       this._savedMonitorGain = g;
       if (!this.monitorGain || !this.ctx) return;
       if (this._shouldHear()) {
-        this.monitorGain.gain.setTargetAtTime(g, this.ctx.currentTime, 0.015);
+        // Immediate (not setTargetAtTime) so the slider tracks the hand — Mac was laggy
+        const t = this.ctx.currentTime;
+        this.monitorGain.gain.cancelScheduledValues(t);
+        this.monitorGain.gain.setValueAtTime(g, t);
       }
     }
 

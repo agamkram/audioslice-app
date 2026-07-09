@@ -439,11 +439,18 @@
 
   /** While true, skip spectrogram draws — stops rotate flutter while Live. */
   let phoneRotateFrozen = false;
+  /** While scrubbing gain, lighten main-thread load so the thumb stays snappy (esp. Mac). */
+  let gainScrubbing = false;
+  let gainScrubFrame = 0;
 
   function tick() {
     if (!runningVisual) return;
     if (!phoneRotateFrozen) {
-      drawColumn();
+      // Full spectrogram column every frame is heavy on large Mac canvases;
+      // while dragging gain, only update every other frame.
+      if (!gainScrubbing || gainScrubFrame++ % 2 === 0) {
+        drawColumn();
+      }
       drawOverlay();
       updateReadouts();
     }
