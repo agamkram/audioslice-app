@@ -376,10 +376,14 @@
     engine.setBand(bandLoHz, bandHiHz);
   }
 
-  /** Always return to 420 Hz focus (210–840 Hz), clear preset highlight. */
+  /** Always return to 420 Hz focus (210–840 Hz), Band mode, clear presets. */
   function resetBandTo420() {
     setBandHz(DEFAULT_BAND_LO_HZ, DEFAULT_BAND_HI_HZ);
     setActivePreset(null);
+    mode = "band";
+    dragging = null;
+    setToggleBtn(el.modeBand, true);
+    setToggleBtn(el.modeDirect, false);
     updateReadouts();
   }
 
@@ -505,10 +509,9 @@
       resetBandTo420();
       applyBandToEngine();
       engine.setMonitorGain(Number(el.gainSlider.value));
-      if (mode !== "band" && mode !== "direct") mode = "band";
-      setMode(mode);
+      setMode("band");
       engine.setMonitorEnabled(true);
-      engine.setMode(mode);
+      engine.setMode("band");
       engine.setDeHiss(engine.deHissOn);
       engine.setRumble(engine.rumbleOn);
 
@@ -518,9 +521,7 @@
       el.status.textContent = "Live";
       el.status.dataset.state = "live";
       el.hint.textContent =
-        mode === "direct"
-          ? "Full unfiltered mic in headphones"
-          : "Drag HI/LO to set range · drag yellow line / anywhere to slide the band";
+        "Drag HI/LO to set range · drag yellow line / anywhere to slide the band";
       el.gainSlider.disabled = false;
       setToggleBtn(el.btnDeHiss, engine.deHissOn);
       setToggleBtn(el.btnRumble, engine.rumbleOn);
@@ -528,6 +529,7 @@
 
       runningVisual = true;
       ensureBuffers();
+      drawOverlay();
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(tick);
     } catch (err) {
