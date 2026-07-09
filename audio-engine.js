@@ -38,101 +38,8 @@
       this._savedMonitorGain = 1.4;
       this._rumbleOn = false;
       this._deHissOn = false;
-      this._constraintTimers = [];
       this.sampleRate = 48000;
       this.nyquist = 24000;
-    }
-
-    /** Prefer raw mic — browsers (esp. Chrome/Mac) love voice processing. */
-    _micConstraints(strict) {
-      const off = strict
-        ? { exact: false }
-        : false;
-      return {
-        echoCancellation: off,
-        noiseSuppression: off,
-        autoGainControl: off,
-        channelCount: { ideal: 1 },
-        // Discourage speech-mode DSP where supported (Safari 17+ / some Chromium)
-        voiceIsolation: off,
-      };
-    }
-
-    async _openMic() {
-      let stream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: this._micConstraints(true),
-          video: false,
-        });
-      } catch (_) {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: this._micConstraints(false),
-          video: false,
-        });
-      }
-      const track = stream.getAudioTracks()[0];
-      if (track) {
-        try {
-          // "music" steers Chrome/Safari away from voice AGC/NS tuning
-          if ("contentHint" in track) track.contentHint = "music";
-        } catch (_) {}
-        await this._assertRawMic(track);
-      }
-      return stream;
-    }
-
-    async _assertRawMic(track) {
-      if (!track) return;
-      const soft = {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-      };
-      try {
-        await track.applyConstraints({
-          echoCancellation: { exact: false },
-          noiseSuppression: { exact: false },
-          autoGainControl: { exact: false },
-        });
-      } catch (_) {
-        try {
-          await track.applyConstraints(soft);
-        } catch (_) {}
-      }
-      try {
-        if ("contentHint" in track) track.contentHint = "music";
-      } catch (_) {}
-      // Debug: if Mac tone still shifts, check whether these flip true after a few seconds
-      try {
-        const s = track.getSettings?.() || {};
-        console.info("[AudioSlice] mic settings", {
-          echoCancellation: s.echoCancellation,
-          noiseSuppression: s.noiseSuppression,
-          autoGainControl: s.autoGainControl,
-          sampleRate: s.sampleRate,
-          channelCount: s.channelCount,
-          contentHint: track.contentHint,
-        });
-      } catch (_) {}
-    }
-
-    _scheduleMicReassert() {
-      this._clearConstraintTimers();
-      // Chrome/macOS sometimes re-engages voice DSP a few seconds in — push back
-      for (const ms of [500, 1500, 3000, 5000]) {
-        const id = setTimeout(() => {
-          const track = this.stream?.getAudioTracks?.()[0];
-          if (!track || track.readyState !== "live") return;
-          this._assertRawMic(track);
-        }, ms);
-        this._constraintTimers.push(id);
-      }
-    }
-
-    _clearConstraintTimers() {
-      for (const id of this._constraintTimers) clearTimeout(id);
-      this._constraintTimers = [];
     }
 
     get isRunning() {
@@ -162,7 +69,21 @@
     async start() {
       if (this.running) return;
 
-      const stream = await this._openMic();
+      // Simple constraints only — repeated applyConstraints / exact:false reconfigures
+      // the Mac capture path and adds noticeable monitor latency.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 1,
+        },
+        video: false,
+      });
+      const track = stream.getAudioTracks()[0];
+      try {
+        if (track && "contentHint" in track) track.contentHint = "music";
+      } catch (_) {}
 
       const Ctx = root.AudioContext || root.webkitAudioContext;
       const ctx = new Ctx({ latencyHint: "interactive" });
@@ -273,13 +194,11 @@
       this._applyRumble(true);
       this._applyDeHiss(true);
       this._routeMode(true);
-      this._scheduleMicReassert();
       requestAnimationFrame(() => this.resume());
     }
 
     stop() {
       if (!this.running) return;
-      this._clearConstraintTimers();
       try {
         this.source?.disconnect();
       } catch (_) {}
