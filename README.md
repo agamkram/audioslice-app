@@ -5,7 +5,7 @@ Live microphone spectrum analyzer — fit-to-screen web app.
 - Live spectrogram (log frequency)
 - **Band** — select a frequency range (HI/LO) and hear only that band in headphones
 - **Full** — unfiltered mic monitor
-- Presets: Birds, Speech, Low
+- Presets: Chirps, Speech, Low
 - Works on modern phones, tablets, and desktops (Safari / Chrome)
 
 ## Local
