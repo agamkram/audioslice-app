@@ -376,6 +376,16 @@
       border-color: rgba(255, 255, 255, 0.15);
     }
 
+    /* Idle (before Start): full look, no interaction — Start stays clickable */
+    .controls.is-idle .btn:not(.btn-primary) {
+      pointer-events: none;
+    }
+
+    .controls.is-idle .btn-ghost:hover {
+      color: var(--muted);
+      border-color: var(--border);
+    }
+
     .slider-field {
       display: grid;
       gap: 0.15rem;
@@ -541,7 +551,7 @@
 
       <p class="hint" id="hint">Headphones in · tap Start mic to listen and see the spectrum</p>
 
-      <div class="controls">
+      <div class="controls is-idle" id="controls">
         <div class="row modes-presets">
           <div class="modes">
             <button type="button" class="btn btn-primary" id="start-btn" data-state="off">Start mic</button>
@@ -569,9 +579,9 @@
     </div>
   </div>
 
-  <script src="fit-to-screen.js?v=88"></script>
-  <script src="audio-engine.js?v=88"></script>
-  <script src="app.js?v=88"></script>
+  <script src="fit-to-screen.js?v=89"></script>
+  <script src="audio-engine.js?v=89"></script>
+  <script src="app.js?v=89"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>

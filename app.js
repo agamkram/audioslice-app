@@ -39,6 +39,7 @@
     presetBirds: null,
     presetSpeech: null,
     presetLow: null,
+    controls: null,
     hint: null,
   };
 
@@ -481,6 +482,7 @@
       el.gainSlider.disabled = false;
       setToggleBtn(el.btnDeHiss, engine.deHissOn);
       setToggleBtn(el.btnRumble, engine.rumbleOn);
+      setControlsLive(true);
 
       runningVisual = true;
       ensureBuffers();
@@ -493,6 +495,7 @@
       el.startBtn.textContent = "Start mic";
       el.startBtn.dataset.state = "off";
       el.startBtn.disabled = false;
+      setControlsLive(false);
     }
   }
 
@@ -507,7 +510,7 @@
     el.status.dataset.state = "";
     el.hint.textContent = "Headphones in · tap Start mic to listen and see the spectrum";
     el.gainSlider.disabled = true;
-    // Keep Band/Full/presets/De-hiss/Rumble lit & selected for next Start
+    setControlsLive(false);
     // Clear canvas
     if (el.canvas) {
       const ctx = el.canvas.getContext("2d");
@@ -541,6 +544,25 @@
     setToggleBtn(btn, on);
   }
 
+  /** Live = after Start: secondary buttons accept input. Idle keeps full lit look. */
+  function setControlsLive(live) {
+    el.controls?.classList.toggle("is-idle", !live);
+    const secondary = [
+      el.modeBand,
+      el.modeDirect,
+      el.presetBirds,
+      el.presetSpeech,
+      el.presetLow,
+      el.btnDeHiss,
+      el.btnRumble,
+    ];
+    for (const btn of secondary) {
+      if (!btn) continue;
+      btn.setAttribute("aria-disabled", live ? "false" : "true");
+      btn.tabIndex = live ? 0 : -1;
+    }
+  }
+
   function setActivePreset(name) {
     activePreset = name || null;
     setToggleBtn(el.presetBirds, activePreset === "birds");
@@ -549,12 +571,13 @@
   }
 
   function applyPreset(name, loHz, hiHz, hint) {
+    if (!engine.running) return;
     bandLoNorm = hzToNorm(loHz);
     bandHiNorm = hzToNorm(hiHz);
     applyBandToEngine();
     setActivePreset(name);
     setMode("band");
-    if (engine.running && hint) el.hint.textContent = hint;
+    if (hint) el.hint.textContent = hint;
   }
 
   function setMode(m) {
@@ -594,18 +617,27 @@
     el.presetBirds = document.getElementById("preset-birds");
     el.presetSpeech = document.getElementById("preset-speech");
     el.presetLow = document.getElementById("preset-low");
+    el.controls = document.getElementById("controls");
     el.hint = document.getElementById("hint");
 
     el.startBtn.addEventListener("click", toggleStart);
-    el.modeBand.addEventListener("click", () => setMode("band"));
-    el.modeDirect?.addEventListener("click", () => setMode("direct"));
+    el.modeBand.addEventListener("click", () => {
+      if (!engine.running) return;
+      setMode("band");
+    });
+    el.modeDirect?.addEventListener("click", () => {
+      if (!engine.running) return;
+      setMode("direct");
+    });
 
     el.gainSlider.addEventListener("input", () => {
+      if (!engine.running) return;
       engine.resume();
       engine.setMonitorGain(Number(el.gainSlider.value));
     });
 
     el.btnDeHiss?.addEventListener("click", () => {
+      if (!engine.running) return;
       engine.setDeHiss(!engine.deHissOn);
       setToggleBtn(el.btnDeHiss, engine.deHissOn);
       el.hint.textContent = engine.deHissOn
@@ -613,6 +645,7 @@
         : "De-hiss off";
     });
     el.btnRumble?.addEventListener("click", () => {
+      if (!engine.running) return;
       engine.setRumble(!engine.rumbleOn);
       setToggleBtn(el.btnRumble, engine.rumbleOn);
       el.hint.textContent = engine.rumbleOn
@@ -648,6 +681,7 @@
     setToggleBtn(el.btnDeHiss, engine.deHissOn);
     setToggleBtn(el.btnRumble, engine.rumbleOn);
     el.gainSlider.disabled = true;
+    setControlsLive(false);
 
     // Fit-to-screen
     function showApp() {
