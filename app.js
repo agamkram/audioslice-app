@@ -629,13 +629,13 @@
     setToggleBtn(el.presetLow, activePreset === "low");
   }
 
-  function applyPreset(name, loHz, hiHz, hint) {
+  function applyPreset(name, loHz, hiHz) {
     if (!engine.running) return;
     setBandHz(loHz, hiHz);
     applyBandToEngine();
     setActivePreset(name);
+    // Same as Band — adjustable range; no sticky “Speech — …” style hint
     setMode("band");
-    if (hint) el.hint.textContent = hint;
   }
 
   function setMode(m) {
@@ -731,13 +731,13 @@
     );
 
     el.presetBirds?.addEventListener("click", () => {
-      applyPreset("birds", 2000, 9000, "Birds — 2–9 kHz");
+      applyPreset("birds", 2000, 9000);
     });
     el.presetSpeech?.addEventListener("click", () => {
-      applyPreset("speech", 300, 3400, "Speech — 300 Hz–3.4 kHz");
+      applyPreset("speech", 300, 3400);
     });
     el.presetLow?.addEventListener("click", () => {
-      applyPreset("low", 40, 250, "Low — 40–250 Hz (rumble / traffic / HVAC)");
+      applyPreset("low", 40, 250);
     });
 
     setMode("band");
