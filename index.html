@@ -340,7 +340,7 @@
       box-shadow: none;
     }
 
-    /* Active toggle look (De-hiss/Rumble style) — not Start/Stop */
+    /* Active toggle look (De-hiss/De-rumble style) — not Start/Stop */
     .btn:not(.btn-primary)[data-on="1"],
     .btn:not(.btn-primary)[aria-pressed="true"] {
       background: rgba(61, 156, 245, 0.22);
@@ -591,16 +591,16 @@
           </div>
           <div class="process-toggles" role="group" aria-label="Listen cleanup">
             <button type="button" class="btn btn-ghost" id="btn-dehiss" aria-pressed="false" title="Cut high-frequency hiss">De-hiss</button>
-            <button type="button" class="btn btn-ghost" id="btn-rumble" aria-pressed="false" title="Cut low rumble / wind / handling">Rumble</button>
+            <button type="button" class="btn btn-ghost" id="btn-rumble" aria-pressed="false" title="Highpass ~150 Hz — cut rumble / wind / handling">De-rumble</button>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="fit-to-screen.js?v=118"></script>
-  <script src="audio-engine.js?v=118"></script>
-  <script src="app.js?v=118"></script>
+  <script src="fit-to-screen.js?v=119"></script>
+  <script src="audio-engine.js?v=119"></script>
+  <script src="app.js?v=119"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>

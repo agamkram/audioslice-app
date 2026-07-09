@@ -805,8 +805,8 @@
       engine.setRumble(!engine.rumbleOn);
       setToggleBtn(el.btnRumble, engine.rumbleOn);
       el.hint.textContent = engine.rumbleOn
-        ? "Rumble on — low rumble / wind cut in headphones"
-        : "Rumble off";
+        ? "De-rumble on — below ~150 Hz cut in headphones"
+        : "De-rumble off";
     });
 
     const surface = el.overlay;

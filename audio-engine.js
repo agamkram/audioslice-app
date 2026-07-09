@@ -141,7 +141,7 @@
       const rumbleFilter = ctx.createBiquadFilter();
       rumbleFilter.type = "highpass";
       rumbleFilter.Q.value = 0.7;
-      rumbleFilter.frequency.value = this._rumbleOn ? 90 : 20;
+      rumbleFilter.frequency.value = this._rumbleOn ? 150 : 20;
 
       const deHissFilter = ctx.createBiquadFilter();
       deHissFilter.type = "highshelf";
@@ -254,8 +254,8 @@
 
     _applyRumble(immediate) {
       if (!this.rumbleFilter || !this.ctx) return;
-      // On: cut sub/rumble; off: pass essentially everything
-      const hz = this._rumbleOn ? 90 : 20;
+      // On: highpass cut below ~150 Hz; off: essentially full band (~20 Hz)
+      const hz = this._rumbleOn ? 150 : 20;
       const t = this.ctx.currentTime;
       if (immediate) this.rumbleFilter.frequency.setValueAtTime(hz, t);
       else this.rumbleFilter.frequency.setTargetAtTime(hz, t, 0.02);
