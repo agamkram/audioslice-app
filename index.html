@@ -483,8 +483,14 @@
         margin: 0;
       }
 
+      /* Same as iPad/Mac: shortened gain + De-hiss/Rumble on one row */
       .row.sliders {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr auto;
+        align-items: end;
+      }
+
+      .process-toggles .btn {
+        padding: 0.32rem 0.42rem;
       }
     }
 
