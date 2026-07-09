@@ -176,12 +176,14 @@
    * - auto-contrast so quiet birds rise above ambient
    */
   function processDisplayLevel(raw01, hz, row) {
-    // 1) Low-frequency visual attenuator (full at ≥200 Hz)
+    // 1) Low-frequency visual attenuator (full at ≥250 Hz)
+    // Gradual roll-off: deep suppress near DC, smooth recover into midrange
     let atten = 1;
-    if (hz < 200) {
-      const t = Math.max(0, (hz - 25) / 175);
-      // Strong suppress near DC/HVAC, gentle into speech
-      atten = 0.08 + 0.92 * t * t;
+    if (hz < 250) {
+      const t = Math.max(0, Math.min(1, (hz - 20) / 230));
+      // Smoothstep (gentler than t²) for a less abrupt wall
+      const s = t * t * (3 - 2 * t);
+      atten = 0.1 + 0.9 * s;
     }
 
     let v = raw01 * 255 * atten;
