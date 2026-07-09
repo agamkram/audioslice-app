@@ -13,6 +13,10 @@
   let spectroW = 0;
   let spectroH = 0;
   let imageData = null;
+  /** Per-row (log-freq) noise floor for display, 0..255 */
+  let noiseFloor = null;
+  /** Slow peak of post-floor signal — auto-contrast for quiet birds */
+  let displayPeak = 40;
 
   // Default band: geometric center = 420 Hz (210–840 Hz)
   // Stored in Hz so focus does not drift when iOS sample-rate/nyquist appears at Start

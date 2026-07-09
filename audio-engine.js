@@ -98,9 +98,11 @@
 
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 4096;
-      analyser.smoothingTimeConstant = 0.35;
-      analyser.minDecibels = -95;
-      analyser.maxDecibels = -15;
+      // Less temporal smear so short bird notes stay sharp on the spectrogram
+      analyser.smoothingTimeConstant = 0.22;
+      // Tighter dB window → weak tones map higher (display still noise-floored in UI)
+      analyser.minDecibels = -88;
+      analyser.maxDecibels = -22;
 
       const inputGain = ctx.createGain();
       // Fixed mic preamp (no UI slider) — room/ambient levels are much quieter than close speech
