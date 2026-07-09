@@ -27,6 +27,8 @@
       this.bandLow = null;
       this.bandHigh2 = null;
       this.bandLow2 = null;
+      this.rumbleFilter = null; // highpass when rumble cut on
+      this.deHissFilter = null; // highshelf cut when de-hiss on
       this.effectSlot = null;
       this.running = false;
       this.mode = "off"; // off | band | direct
@@ -34,6 +36,8 @@
       this.bandHighHz = 8000;
       this._monitorOn = false;
       this._savedMonitorGain = 1.4;
+      this._rumbleOn = false;
+      this._deHissOn = false;
       this.sampleRate = 48000;
       this.nyquist = 24000;
     }
@@ -124,6 +128,17 @@
       const directGate = ctx.createGain();
       directGate.gain.value = 0;
 
+      // Listen-path only (spectrum stays raw): rumble cut + de-hiss
+      const rumbleFilter = ctx.createBiquadFilter();
+      rumbleFilter.type = "highpass";
+      rumbleFilter.Q.value = 0.7;
+      rumbleFilter.frequency.value = 20;
+
+      const deHissFilter = ctx.createBiquadFilter();
+      deHissFilter.type = "highshelf";
+      deHissFilter.frequency.value = 5500;
+      deHissFilter.gain.value = 0;
+
       const monitorGain = ctx.createGain();
       monitorGain.gain.value = 0;
 
@@ -139,10 +154,13 @@
       bandHigh2.connect(bandLow);
       bandLow.connect(bandLow2);
       bandLow2.connect(bandGate);
-      bandGate.connect(monitorGain);
+      bandGate.connect(rumbleFilter);
 
       effectSlot.connect(directGate);
-      directGate.connect(monitorGain);
+      directGate.connect(rumbleFilter);
+
+      rumbleFilter.connect(deHissFilter);
+      deHissFilter.connect(monitorGain);
 
       monitorGain.connect(stereoOut, 0, 0);
       monitorGain.connect(stereoOut, 0, 1);
@@ -158,11 +176,15 @@
       this.bandLow2 = bandLow2;
       this.bandGate = bandGate;
       this.directGate = directGate;
+      this.rumbleFilter = rumbleFilter;
+      this.deHissFilter = deHissFilter;
       this.monitorGain = monitorGain;
       this.stereoOut = stereoOut;
       this.running = true;
 
       this._applyBand();
+      this._applyRumble();
+      this._applyDeHiss();
       this._routeMode();
       requestAnimationFrame(() => this.resume());
     }
@@ -193,11 +215,45 @@
       this.analyser = null;
       this.bandGate = null;
       this.directGate = null;
+      this.rumbleFilter = null;
+      this.deHissFilter = null;
       this.monitorGain = null;
       this.stereoOut = null;
       this.running = false;
       this.mode = "off";
       this._monitorOn = false;
+    }
+
+    get rumbleOn() {
+      return this._rumbleOn;
+    }
+
+    get deHissOn() {
+      return this._deHissOn;
+    }
+
+    setRumble(on) {
+      this._rumbleOn = !!on;
+      this._applyRumble();
+    }
+
+    setDeHiss(on) {
+      this._deHissOn = !!on;
+      this._applyDeHiss();
+    }
+
+    _applyRumble() {
+      if (!this.rumbleFilter || !this.ctx) return;
+      // On: cut sub/rumble; off: pass essentially everything
+      const hz = this._rumbleOn ? 90 : 20;
+      this.rumbleFilter.frequency.setTargetAtTime(hz, this.ctx.currentTime, 0.02);
+    }
+
+    _applyDeHiss() {
+      if (!this.deHissFilter || !this.ctx) return;
+      // On: gentle high-shelf cut (hiss); off: flat
+      const g = this._deHissOn ? -12 : 0;
+      this.deHissFilter.gain.setTargetAtTime(g, this.ctx.currentTime, 0.02);
     }
 
     setMonitorEnabled(on) {

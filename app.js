@@ -34,6 +34,8 @@
     freqReadout: null,
     bandReadout: null,
     gainSlider: null,
+    btnDeHiss: null,
+    btnRumble: null,
     hint: null,
   };
 
@@ -468,6 +470,10 @@
       el.modeBand.disabled = false;
       if (el.modeDirect) el.modeDirect.disabled = false;
       el.gainSlider.disabled = false;
+      setProcessBtn(el.btnDeHiss, engine.deHissOn);
+      setProcessBtn(el.btnRumble, engine.rumbleOn);
+      if (el.btnDeHiss) el.btnDeHiss.disabled = false;
+      if (el.btnRumble) el.btnRumble.disabled = false;
 
       runningVisual = true;
       ensureBuffers();
@@ -496,6 +502,14 @@
     el.modeBand.disabled = true;
     if (el.modeDirect) el.modeDirect.disabled = true;
     el.gainSlider.disabled = true;
+    if (el.btnDeHiss) {
+      el.btnDeHiss.disabled = true;
+      setProcessBtn(el.btnDeHiss, false);
+    }
+    if (el.btnRumble) {
+      el.btnRumble.disabled = true;
+      setProcessBtn(el.btnRumble, false);
+    }
     // Clear canvas
     if (el.canvas) {
       const ctx = el.canvas.getContext("2d");
@@ -517,6 +531,12 @@
   function toggleStart() {
     if (engine.running) stopListening();
     else startListening();
+  }
+
+  function setProcessBtn(btn, on) {
+    if (!btn) return;
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+    btn.dataset.on = on ? "1" : "0";
   }
 
   function setMode(m) {
@@ -554,6 +574,8 @@
     el.freqReadout = document.getElementById("freq-readout");
     el.bandReadout = document.getElementById("band-readout");
     el.gainSlider = document.getElementById("gain");
+    el.btnDeHiss = document.getElementById("btn-dehiss");
+    el.btnRumble = document.getElementById("btn-rumble");
     el.hint = document.getElementById("hint");
 
     el.startBtn.addEventListener("click", toggleStart);
@@ -563,6 +585,23 @@
     el.gainSlider.addEventListener("input", () => {
       engine.resume();
       engine.setMonitorGain(Number(el.gainSlider.value));
+    });
+
+    el.btnDeHiss?.addEventListener("click", () => {
+      if (!engine.running) return;
+      engine.setDeHiss(!engine.deHissOn);
+      setProcessBtn(el.btnDeHiss, engine.deHissOn);
+      el.hint.textContent = engine.deHissOn
+        ? "De-hiss on — high-frequency hiss cut in headphones"
+        : "De-hiss off";
+    });
+    el.btnRumble?.addEventListener("click", () => {
+      if (!engine.running) return;
+      engine.setRumble(!engine.rumbleOn);
+      setProcessBtn(el.btnRumble, engine.rumbleOn);
+      el.hint.textContent = engine.rumbleOn
+        ? "Rumble on — low rumble / wind cut in headphones"
+        : "Rumble off";
     });
 
     const surface = el.overlay;
@@ -603,6 +642,8 @@
     el.modeBand.disabled = true;
     if (el.modeDirect) el.modeDirect.disabled = true;
     el.gainSlider.disabled = true;
+    if (el.btnDeHiss) el.btnDeHiss.disabled = true;
+    if (el.btnRumble) el.btnRumble.disabled = true;
 
     // Fit-to-screen
     function showApp() {

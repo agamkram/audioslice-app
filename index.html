@@ -279,8 +279,22 @@
 
     .row.sliders {
       display: grid;
-      grid-template-columns: 1fr;
-      gap: 0.4rem 0.6rem;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 0.35rem 0.45rem;
+    }
+
+    .process-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.28rem;
+      padding-bottom: 0.05rem;
+    }
+
+    .process-toggles .btn {
+      padding: 0.35rem 0.5rem;
+      font-size: var(--text-ui);
     }
 
     .btn {
@@ -538,14 +552,18 @@
             <label for="gain"><span>Headphone gain</span></label>
             <input id="gain" type="range" min="0" max="4" step="0.05" value="1.4" disabled />
           </div>
+          <div class="process-toggles" role="group" aria-label="Listen cleanup">
+            <button type="button" class="btn btn-ghost" id="btn-dehiss" aria-pressed="false" disabled title="Cut high-frequency hiss">De-hiss</button>
+            <button type="button" class="btn btn-ghost" id="btn-rumble" aria-pressed="false" disabled title="Cut low rumble / wind / handling">Rumble</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="fit-to-screen.js?v=85"></script>
-  <script src="audio-engine.js?v=85"></script>
-  <script src="app.js?v=85"></script>
+  <script src="fit-to-screen.js?v=86"></script>
+  <script src="audio-engine.js?v=86"></script>
+  <script src="app.js?v=86"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
