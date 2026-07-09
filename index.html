@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="theme-color" content="#0a0e14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="AudioSlice" />
+  <meta
+    name="description"
+    content="Live microphone spectrum analyzer. Select a frequency band and hear only that range through headphones."
+  />
+  <title>AudioSlice</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="apple-touch-icon.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg: #0a0e14;
+      --surface: #121a24;
+      --surface-2: #1a2533;
+      --text: #e8edf4;
+      --muted: #8b9cb3;
+      --accent: #3d9cf5;
+      --accent-glow: rgba(61, 156, 245, 0.22);
+      --scrub: #facc15;
+      --live: #4ade80;
+      --danger: #f87171;
+      --border: rgba(255, 255, 255, 0.08);
+      --app-gap: clamp(0.3rem, 1vmin, 0.5rem);
+      --text-title: clamp(1.05rem, 3.2vmin, 1.35rem);
+      --text-ui: clamp(0.62rem, 1.55vmin, 0.72rem);
+      --text-value: clamp(0.85rem, 2.2vmin, 1.05rem);
+      --text-label: clamp(0.55rem, 1.35vmin, 0.65rem);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background: var(--bg);
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    body {
+      height: 100%;
+      height: 100dvh;
+      min-height: 100dvh;
+      overflow: hidden;
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .fit-stage {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding:
+        max(0.2rem, env(safe-area-inset-top))
+        max(0.35rem, env(safe-area-inset-right))
+        max(0.2rem, env(safe-area-inset-bottom))
+        max(0.35rem, env(safe-area-inset-left));
+    }
+
+    .fit-stage.fit-stage--fluid {
+      align-items: stretch;
+      justify-content: stretch;
+    }
+
+    .fit-stage.fit-stage--fluid .app {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+    }
+
+    .app {
+      position: relative;
+      flex-shrink: 0;
+      box-sizing: border-box;
+      width: 720px;
+      height: min(920px, 100%);
+      max-height: 100%;
+      padding: 0.45rem 0.5rem 0.5rem;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+      gap: var(--app-gap);
+      transform: scale(1);
+      transform-origin: center center;
+      will-change: transform;
+      background: radial-gradient(120% 80% at 50% 0%, #121a28 0%, var(--bg) 55%);
+      border-radius: 14px;
+    }
+
+    /* Brief hide only while first paint measures — never leave PWA stuck blank */
+    .app:not(.is-fitted) {
+      opacity: 0;
+    }
+    .app.is-fitted {
+      opacity: 1;
+      transition: opacity 0.12s ease;
+    }
+
+    header.top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      min-height: 2.1rem;
+    }
+
+    .brand {
+      min-width: 0;
+    }
+
+    .brand h1 {
+      font-size: var(--text-title);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      line-height: 1.1;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: var(--text-ui);
+      color: var(--muted);
+      padding: 0.28rem 0.55rem;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .status::before {
+      content: "";
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .status[data-state="live"] {
+      color: var(--live);
+      border-color: rgba(74, 222, 128, 0.25);
+    }
+
+    .status[data-state="live"]::before {
+      background: var(--live);
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.7);
+    }
+
+    .status[data-state="err"] {
+      color: var(--danger);
+    }
+
+    .status[data-state="err"]::before {
+      background: var(--danger);
+    }
+
+    .readouts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.35rem;
+    }
+
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.35rem 0.55rem;
+      min-width: 0;
+    }
+
+    .stat-label {
+      font-size: var(--text-label);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-value {
+      font-size: var(--text-value);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--text);
+      margin-top: 0.1rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #freq-readout[data-kind="slide"] {
+      color: var(--scrub);
+    }
+
+    #freq-readout[data-kind="peak"] {
+      color: var(--live);
+    }
+
+    .viz-wrap {
+      position: relative;
+      min-height: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #060a10;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+      touch-action: none;
+    }
+
+    .viz-wrap canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    #overlay {
+      z-index: 2;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .hint {
+      font-size: var(--text-ui);
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.35;
+      min-height: 1.35em;
+      padding: 0 0.25rem;
+    }
+
+    .controls {
+      display: grid;
+      gap: 0.4rem;
+      padding: 0.45rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .row.sliders {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.4rem 0.6rem;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-family: inherit;
+      font-size: var(--text-ui);
+      font-weight: 600;
+      padding: 0.45rem 0.7rem;
+      border-radius: 9px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
+      white-space: nowrap;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn:not(:disabled):active {
+      transform: scale(0.98);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: transparent;
+      color: #061018;
+      box-shadow: 0 0 0 1px rgba(61, 156, 245, 0.3), 0 0 18px var(--accent-glow);
+    }
+
+    .btn-primary[data-state="on"] {
+      background: #243044;
+      color: var(--danger);
+      border-color: rgba(248, 113, 113, 0.35);
+      box-shadow: none;
+    }
+
+    .btn[data-on="1"],
+    .btn[aria-pressed="true"] {
+      background: rgba(61, 156, 245, 0.2);
+      border-color: rgba(61, 156, 245, 0.55);
+      color: #9ec9f8;
+    }
+
+    .row.modes-presets {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.35rem 0.5rem;
+    }
+
+    .row.modes-presets .modes,
+    .row.modes-presets .presets {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .row.modes-presets .presets {
+      margin-left: auto;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      font-weight: 500;
+      padding: 0.35rem 0.55rem;
+      color: var(--muted);
+    }
+
+    .btn-ghost:not(:disabled):hover {
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .slider-field {
+      display: grid;
+      gap: 0.15rem;
+      min-width: 0;
+    }
+
+    .slider-field label {
+      font-size: var(--text-label);
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 1.4rem;
+      background: transparent;
+      margin: 0;
+    }
+
+    input[type="range"]:disabled {
+      opacity: 0.4;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      background: var(--surface-2);
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      margin-top: -7px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #e8edf4;
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    input[type="range"]::-moz-range-track {
+      height: 4px;
+      background: var(--surface-2);
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #e8edf4;
+    }
+
+    /* Phone only — fill visible area; spectrogram takes leftover space */
+    @media (max-width: 767px) {
+      .fit-stage {
+        align-items: stretch;
+        justify-content: stretch;
+        padding:
+          max(0.12rem, env(safe-area-inset-top))
+          max(0.3rem, env(safe-area-inset-right))
+          max(0.12rem, env(safe-area-inset-bottom))
+          max(0.3rem, env(safe-area-inset-left));
+      }
+
+      .app {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        border-radius: 0;
+        padding: 0.28rem 0.38rem 0.2rem;
+        gap: 0.25rem;
+        display: flex;
+        flex-direction: column;
+        transform: none !important;
+        will-change: auto;
+      }
+
+      .app > header.top,
+      .app > .readouts,
+      .app > .hint,
+      .app > .controls {
+        flex: 0 0 auto;
+      }
+
+      .app > .viz-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      .app > .controls {
+        padding: 0.36rem;
+        /* do NOT margin-top:auto — that pushed the card under Safari chrome */
+      }
+
+      .hint {
+        min-height: 1.1em;
+        margin: 0;
+      }
+
+      .row.sliders {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 767px) and (display-mode: standalone) {
+      .fit-stage {
+        /* keep home-indicator clearance on the stage, not inside the card */
+        padding-bottom: max(0.2rem, env(safe-area-inset-bottom));
+      }
+
+      .app {
+        padding-bottom: 0.1rem;
+      }
+
+      /* Only change: less empty pad under the gain slider inside the card */
+      .app > .controls {
+        padding-bottom: 0.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="fit-stage" id="fit-stage">
+    <div class="app" id="app" role="application" aria-label="AudioSlice sound analyzer">
+      <header class="top">
+        <div class="brand">
+          <h1>AudioSlice</h1>
+        </div>
+        <div class="status" id="status">Mic off</div>
+      </header>
+
+      <div class="readouts">
+        <div class="stat">
+          <div class="stat-label">Focus</div>
+          <div class="stat-value" id="freq-readout">—</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Band</div>
+          <div class="stat-value" id="band-readout">2.0 – 8.0 kHz</div>
+        </div>
+      </div>
+
+      <div class="viz-wrap" id="viz-wrap" aria-label="Live spectrogram">
+        <canvas id="spectro" aria-hidden="true"></canvas>
+        <canvas id="overlay" aria-label="Band selection surface"></canvas>
+      </div>
+
+      <p class="hint" id="hint">Headphones in · tap Start mic to listen and see the spectrum</p>
+
+      <div class="controls">
+        <div class="row modes-presets">
+          <div class="modes">
+            <button type="button" class="btn btn-primary" id="start-btn" data-state="off">Start mic</button>
+            <button type="button" class="btn" id="mode-band" aria-pressed="true" disabled>Band</button>
+            <button type="button" class="btn" id="mode-direct" aria-pressed="false" disabled title="Unfiltered mic — use to test headphones">Full</button>
+          </div>
+          <div class="presets" role="group" aria-label="Band presets">
+            <button type="button" class="btn btn-ghost" id="preset-birds" title="2–9 kHz">Birds</button>
+            <button type="button" class="btn btn-ghost" id="preset-speech" title="300 Hz–3.4 kHz">Speech</button>
+            <button type="button" class="btn btn-ghost" id="preset-low" title="40–250 Hz — rumble, traffic, HVAC">Low</button>
+          </div>
+        </div>
+
+        <div class="row sliders">
+          <div class="slider-field">
+            <label for="gain"><span>Headphone gain</span></label>
+            <input id="gain" type="range" min="0" max="4" step="0.05" value="1.4" disabled />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="fit-to-screen.js?v=85"></script>
+  <script src="audio-engine.js?v=85"></script>
+  <script src="app.js?v=85"></script>
+  <script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>
