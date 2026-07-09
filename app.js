@@ -15,16 +15,18 @@
   let imageData = null;
 
   // Default band: geometric center = 420 Hz (210–840 Hz)
+  // Stored in Hz so focus does not drift when iOS sample-rate/nyquist appears at Start
+  // (norm space used 22050 Hz before run vs 24000 after → ~436 Hz focus).
   const DEFAULT_BAND_LO_HZ = 210;
   const DEFAULT_BAND_HI_HZ = 840;
 
-  // Interaction
-  let bandLoNorm = hzToNorm(DEFAULT_BAND_LO_HZ); // 0 bottom … 1 top in log-freq space
-  let bandHiNorm = hzToNorm(DEFAULT_BAND_HI_HZ);
+  // Interaction — absolute Hz is source of truth
+  let bandLoHz = DEFAULT_BAND_LO_HZ;
+  let bandHiHz = DEFAULT_BAND_HI_HZ;
   let dragging = null; // 'lo' | 'hi' | 'band' | null
   let dragStartY = 0;
-  let dragStartLo = 0;
-  let dragStartHi = 0;
+  let dragStartLoHz = 0;
+  let dragStartHiHz = 0;
   let mode = "band"; // band | direct
 
   const el = {
@@ -54,7 +56,8 @@
     return engine.minHz || 20;
   }
   function maxHz() {
-    return engine.running ? engine.maxHz : 22050;
+    // Always use engine nyquist (updated on start) — band lives in Hz so UI stays stable
+    return engine.maxHz || 22050;
   }
 
   function normToHz(n) {
@@ -69,6 +72,30 @@
     const hi = Math.log(maxHz());
     const v = Math.log(Math.max(minHz(), Math.min(maxHz(), hz)));
     return (v - lo) / (hi - lo);
+  }
+
+  function bandLoNorm() {
+    return hzToNorm(bandLoHz);
+  }
+
+  function bandHiNorm() {
+    return hzToNorm(bandHiHz);
+  }
+
+  function setBandHz(loHz, hiHz) {
+    let lo = Math.min(loHz, hiHz);
+    let hi = Math.max(loHz, hiHz);
+    const floor = minHz();
+    const ceil = maxHz();
+    lo = Math.max(floor, Math.min(ceil * 0.98, lo));
+    hi = Math.max(floor * 1.05, Math.min(ceil, hi));
+    if (hi <= lo * 1.05) hi = Math.min(ceil, lo * 1.05);
+    bandLoHz = lo;
+    bandHiHz = hi;
+  }
+
+  function setBandFromNorms(loN, hiN) {
+    setBandHz(normToHz(loN), normToHz(hiN));
   }
 
   function yToNorm(y, height) {
@@ -227,8 +254,8 @@
     }
 
     // Band region (shown whenever band listening is active)
-    const yHi = normToY(bandHiNorm, H);
-    const yLo = normToY(bandLoNorm, H);
+    const yHi = normToY(bandHiNorm(), H);
+    const yLo = normToY(bandLoNorm(), H);
     const top = Math.min(yHi, yLo);
     const bot = Math.max(yHi, yLo);
     const mid = (top + bot) / 2;
@@ -326,12 +353,14 @@
   }
 
   function updateReadouts() {
-    const lo = normToHz(bandLoNorm);
-    const hi = normToHz(bandHiNorm);
-    el.bandReadout.textContent = formatBand(lo, hi);
+    const lo = bandLoHz;
+    const hi = bandHiHz;
+    if (el.bandReadout) el.bandReadout.textContent = formatBand(lo, hi);
     // Focus = geometric center of selected band
-    el.freqReadout.textContent = formatHz(Math.sqrt(lo * hi));
-    el.freqReadout.dataset.kind = dragging === "band" ? "slide" : "band";
+    if (el.freqReadout) {
+      el.freqReadout.textContent = formatHz(Math.sqrt(lo * hi));
+      el.freqReadout.dataset.kind = dragging === "band" ? "slide" : "band";
+    }
   }
 
   function formatHz(hz) {
@@ -344,7 +373,7 @@
   }
 
   function applyBandToEngine() {
-    engine.setBand(normToHz(bandLoNorm), normToHz(bandHiNorm));
+    engine.setBand(bandLoHz, bandHiHz);
   }
 
   // —— Pointer interaction ——
@@ -362,8 +391,8 @@
 
   /** HI/LO only hit on the handle buttons (right edge), not the full width of the line. */
   function hitTestBand(x, y, W, H) {
-    const yHi = normToY(bandHiNorm, H);
-    const yLo = normToY(bandLoNorm, H);
+    const yHi = normToY(bandHiNorm(), H);
+    const yLo = normToY(bandLoNorm(), H);
     const top = Math.min(yHi, yLo);
     const bot = Math.max(yHi, yLo);
     const mid = (top + bot) / 2;
@@ -409,8 +438,8 @@
       // Slide whole band (works inside the band, on the lines, or in the margin)
       dragging = "band";
       dragStartY = p.y;
-      dragStartLo = bandLoNorm;
-      dragStartHi = bandHiNorm;
+      dragStartLoHz = bandLoHz;
+      dragStartHiHz = bandHiHz;
     }
 
     el.overlay.setPointerCapture?.(e.pointerId);
@@ -423,17 +452,20 @@
     const n = Math.max(0.02, Math.min(0.98, yToNorm(p.y, p.H)));
 
     if (dragging === "hi") {
-      bandHiNorm = Math.max(bandLoNorm + 0.02, n);
+      setBandFromNorms(bandLoNorm(), Math.max(bandLoNorm() + 0.02, n));
       setActivePreset(null);
       applyBandToEngine();
     } else if (dragging === "lo") {
-      bandLoNorm = Math.min(bandHiNorm - 0.02, n);
+      setBandFromNorms(Math.min(bandHiNorm() - 0.02, n), bandHiNorm());
       setActivePreset(null);
       applyBandToEngine();
     } else if (dragging === "band") {
+      // Slide in log-norm space from the Hz snapshot at pointer-down
+      const startLoN = hzToNorm(dragStartLoHz);
+      const startHiN = hzToNorm(dragStartHiHz);
       const dNorm = yToNorm(p.y, p.H) - yToNorm(dragStartY, p.H);
-      let lo = dragStartLo + dNorm;
-      let hi = dragStartHi + dNorm;
+      let lo = startLoN + dNorm;
+      let hi = startHiN + dNorm;
       if (lo < 0.02) {
         hi += 0.02 - lo;
         lo = 0.02;
@@ -442,8 +474,7 @@
         lo -= hi - 0.98;
         hi = 0.98;
       }
-      bandLoNorm = Math.max(0.02, lo);
-      bandHiNorm = Math.min(0.98, hi);
+      setBandFromNorms(Math.max(0.02, lo), Math.min(0.98, hi));
       setActivePreset(null);
       applyBandToEngine();
     }
@@ -576,8 +607,7 @@
 
   function applyPreset(name, loHz, hiHz, hint) {
     if (!engine.running) return;
-    bandLoNorm = hzToNorm(loHz);
-    bandHiNorm = hzToNorm(hiHz);
+    setBandHz(loHz, hiHz);
     applyBandToEngine();
     setActivePreset(name);
     setMode("band");
