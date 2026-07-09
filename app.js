@@ -543,7 +543,7 @@
     el.startBtn.dataset.state = "off";
     el.status.textContent = "Mic off";
     el.status.dataset.state = "";
-    el.hint.textContent = "Headphones in · tap Start mic to listen and see the spectrum";
+    el.hint.textContent = "Wired headphones on. Start mic to isolate spectrum";
     el.gainSlider.disabled = true;
     setControlsLive(false);
     // Clear canvas
