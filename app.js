@@ -739,7 +739,7 @@
     );
 
     el.presetBirds?.addEventListener("click", () => {
-      applyPreset("birds", 2000, 9000);
+      applyPreset("birds", 4000, 9000);
     });
     el.presetSpeech?.addEventListener("click", () => {
       applyPreset("speech", 300, 3400);
