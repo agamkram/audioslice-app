@@ -376,9 +376,17 @@
       border-color: rgba(255, 255, 255, 0.15);
     }
 
-    /* Idle (before Start): full look, no interaction — Start stays clickable */
+    /* Idle (before Start): full look, no interaction, no glow — Start stays clickable */
     .controls.is-idle .btn:not(.btn-primary) {
       pointer-events: none;
+    }
+
+    .controls.is-idle .btn:not(.btn-primary)[data-on="1"],
+    .controls.is-idle .btn:not(.btn-primary)[aria-pressed="true"] {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--muted);
+      box-shadow: none;
     }
 
     .controls.is-idle .btn-ghost:hover {
@@ -579,9 +587,9 @@
     </div>
   </div>
 
-  <script src="fit-to-screen.js?v=89"></script>
-  <script src="audio-engine.js?v=89"></script>
-  <script src="app.js?v=89"></script>
+  <script src="fit-to-screen.js?v=90"></script>
+  <script src="audio-engine.js?v=90"></script>
+  <script src="app.js?v=90"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
