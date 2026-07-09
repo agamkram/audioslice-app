@@ -36,8 +36,13 @@
     gainSlider: null,
     btnDeHiss: null,
     btnRumble: null,
+    presetBirds: null,
+    presetSpeech: null,
+    presetLow: null,
     hint: null,
   };
+
+  let activePreset = null; // 'birds' | 'speech' | 'low' | null
 
   // —— Frequency mapping (log, low at bottom) ——
   function minHz() {
@@ -414,9 +419,11 @@
 
     if (dragging === "hi") {
       bandHiNorm = Math.max(bandLoNorm + 0.02, n);
+      setActivePreset(null);
       applyBandToEngine();
     } else if (dragging === "lo") {
       bandLoNorm = Math.min(bandHiNorm - 0.02, n);
+      setActivePreset(null);
       applyBandToEngine();
     } else if (dragging === "band") {
       const dNorm = yToNorm(p.y, p.H) - yToNorm(dragStartY, p.H);
@@ -432,6 +439,7 @@
       }
       bandLoNorm = Math.max(0.02, lo);
       bandHiNorm = Math.min(0.98, hi);
+      setActivePreset(null);
       applyBandToEngine();
     }
   }
@@ -453,6 +461,7 @@
       await engine.resume();
       bandLoNorm = hzToNorm(2000);
       bandHiNorm = hzToNorm(8000);
+      setActivePreset(null);
       applyBandToEngine();
       engine.setMonitorGain(Number(el.gainSlider.value));
       if (mode !== "band" && mode !== "direct") mode = "band";
@@ -533,22 +542,39 @@
     else startListening();
   }
 
-  function setProcessBtn(btn, on) {
+  function setToggleBtn(btn, on) {
     if (!btn) return;
     btn.setAttribute("aria-pressed", on ? "true" : "false");
     btn.dataset.on = on ? "1" : "0";
+  }
+
+  function setProcessBtn(btn, on) {
+    setToggleBtn(btn, on);
+  }
+
+  function setActivePreset(name) {
+    activePreset = name || null;
+    setToggleBtn(el.presetBirds, activePreset === "birds");
+    setToggleBtn(el.presetSpeech, activePreset === "speech");
+    setToggleBtn(el.presetLow, activePreset === "low");
+  }
+
+  function applyPreset(name, loHz, hiHz, hint) {
+    bandLoNorm = hzToNorm(loHz);
+    bandHiNorm = hzToNorm(hiHz);
+    applyBandToEngine();
+    setActivePreset(name);
+    setMode("band");
+    if (engine.running && hint) el.hint.textContent = hint;
   }
 
   function setMode(m) {
     if (m !== "band" && m !== "direct") m = "band";
     dragging = null;
     mode = m;
-    el.modeBand.setAttribute("aria-pressed", m === "band" ? "true" : "false");
-    el.modeBand.dataset.on = m === "band" ? "1" : "0";
-    if (el.modeDirect) {
-      el.modeDirect.setAttribute("aria-pressed", m === "direct" ? "true" : "false");
-      el.modeDirect.dataset.on = m === "direct" ? "1" : "0";
-    }
+    setToggleBtn(el.modeBand, m === "band");
+    setToggleBtn(el.modeDirect, m === "direct");
+    if (m === "direct") setActivePreset(null);
     if (!engine.running) return;
     engine.resume();
     engine.setMonitorEnabled(true);
@@ -576,6 +602,9 @@
     el.gainSlider = document.getElementById("gain");
     el.btnDeHiss = document.getElementById("btn-dehiss");
     el.btnRumble = document.getElementById("btn-rumble");
+    el.presetBirds = document.getElementById("preset-birds");
+    el.presetSpeech = document.getElementById("preset-speech");
+    el.presetLow = document.getElementById("preset-low");
     el.hint = document.getElementById("hint");
 
     el.startBtn.addEventListener("click", toggleStart);
@@ -590,7 +619,7 @@
     el.btnDeHiss?.addEventListener("click", () => {
       if (!engine.running) return;
       engine.setDeHiss(!engine.deHissOn);
-      setProcessBtn(el.btnDeHiss, engine.deHissOn);
+      setToggleBtn(el.btnDeHiss, engine.deHissOn);
       el.hint.textContent = engine.deHissOn
         ? "De-hiss on — high-frequency hiss cut in headphones"
         : "De-hiss off";
@@ -598,7 +627,7 @@
     el.btnRumble?.addEventListener("click", () => {
       if (!engine.running) return;
       engine.setRumble(!engine.rumbleOn);
-      setProcessBtn(el.btnRumble, engine.rumbleOn);
+      setToggleBtn(el.btnRumble, engine.rumbleOn);
       el.hint.textContent = engine.rumbleOn
         ? "Rumble on — low rumble / wind cut in headphones"
         : "Rumble off";
@@ -617,28 +646,18 @@
       { passive: false }
     );
 
-    // Bird preset
-    document.getElementById("preset-birds")?.addEventListener("click", () => {
-      bandLoNorm = hzToNorm(2000);
-      bandHiNorm = hzToNorm(9000);
-      applyBandToEngine();
-      setMode("band");
+    el.presetBirds?.addEventListener("click", () => {
+      applyPreset("birds", 2000, 9000, "Birds — 2–9 kHz");
     });
-    document.getElementById("preset-speech")?.addEventListener("click", () => {
-      bandLoNorm = hzToNorm(300);
-      bandHiNorm = hzToNorm(3400);
-      applyBandToEngine();
-      setMode("band");
+    el.presetSpeech?.addEventListener("click", () => {
+      applyPreset("speech", 300, 3400, "Speech — 300 Hz–3.4 kHz");
     });
-    // Low: rumble / traffic / HVAC — complements Birds (high) and Speech (mid)
-    document.getElementById("preset-low")?.addEventListener("click", () => {
-      bandLoNorm = hzToNorm(40);
-      bandHiNorm = hzToNorm(250);
-      applyBandToEngine();
-      setMode("band");
+    el.presetLow?.addEventListener("click", () => {
+      applyPreset("low", 40, 250, "Low — 40–250 Hz (rumble / traffic / HVAC)");
     });
 
     setMode("band");
+    setActivePreset(null);
     el.modeBand.disabled = true;
     if (el.modeDirect) el.modeDirect.disabled = true;
     el.gainSlider.disabled = true;
