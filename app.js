@@ -111,35 +111,42 @@
   }
 
   // —— Color map: deep → blue → cyan → yellow → white ——
+  // Tuned so low mapped values stay near black (less “mud”).
   function colorMap(v, out, i) {
-    // v 0..255
-    const t = v / 255;
+    // v 0..255 (already contrast-processed)
+    const t = Math.max(0, Math.min(1, v / 255));
     let r, g, b;
-    if (t < 0.15) {
-      const u = t / 0.15;
-      r = 4 + u * 12;
-      g = 6 + u * 20;
-      b = 18 + u * 50;
-    } else if (t < 0.4) {
-      const u = (t - 0.15) / 0.25;
-      r = 16 + u * 20;
-      g = 26 + u * 80;
-      b = 68 + u * 160;
-    } else if (t < 0.65) {
-      const u = (t - 0.4) / 0.25;
-      r = 36 + u * 20;
-      g = 106 + u * 120;
-      b = 228 - u * 60;
-    } else if (t < 0.85) {
-      const u = (t - 0.65) / 0.2;
-      r = 56 + u * 180;
-      g = 226 - u * 40;
-      b = 168 - u * 120;
+    if (t < 0.08) {
+      // Near-black — hide residual floor
+      const u = t / 0.08;
+      r = 6 + u * 6;
+      g = 8 + u * 8;
+      b = 14 + u * 18;
+    } else if (t < 0.28) {
+      const u = (t - 0.08) / 0.2;
+      r = 12 + u * 18;
+      g = 16 + u * 40;
+      b = 32 + u * 120;
+    } else if (t < 0.5) {
+      const u = (t - 0.28) / 0.22;
+      r = 30 + u * 20;
+      g = 56 + u * 100;
+      b = 152 + u * 70;
+    } else if (t < 0.72) {
+      const u = (t - 0.5) / 0.22;
+      r = 50 + u * 40;
+      g = 156 + u * 70;
+      b = 222 - u * 50;
+    } else if (t < 0.88) {
+      const u = (t - 0.72) / 0.16;
+      r = 90 + u * 140;
+      g = 226 - u * 30;
+      b = 172 - u * 100;
     } else {
-      const u = (t - 0.85) / 0.15;
-      r = 236 + u * 19;
-      g = 186 + u * 69;
-      b = 48 + u * 207;
+      const u = (t - 0.88) / 0.12;
+      r = 230 + u * 25;
+      g = 196 + u * 50;
+      b = 72 + u * 180;
     }
     out[i] = r;
     out[i + 1] = g;
@@ -154,6 +161,48 @@
       data[i + 2] = 20;
       data[i + 3] = 255;
     }
+  }
+
+  function ensureNoiseFloor(h) {
+    if (noiseFloor && noiseFloor.length === h) return;
+    noiseFloor = new Float32Array(h);
+    noiseFloor.fill(18);
+  }
+
+  /**
+   * Display-only cleanup:
+   * - tame sub-200 Hz rumble mess (does not change headphones)
+   * - track slow per-freq noise floor, subtract it
+   * - auto-contrast so quiet birds rise above ambient
+   */
+  function processDisplayLevel(raw01, hz, row) {
+    // 1) Low-frequency visual attenuator (full at ≥200 Hz)
+    let atten = 1;
+    if (hz < 200) {
+      const t = Math.max(0, (hz - 25) / 175);
+      // Strong suppress near DC/HVAC, gentle into speech
+      atten = 0.08 + 0.92 * t * t;
+    }
+
+    let v = raw01 * 255 * atten;
+
+    // 2) Slow noise floor (follows ambient, lags behind chirps)
+    const floor = noiseFloor[row];
+    if (v < floor) {
+      // track down quickly when quieter
+      noiseFloor[row] = floor * 0.92 + v * 0.08;
+    } else {
+      // rise very slowly — don't treat birds as floor
+      noiseFloor[row] = floor * 0.9985 + v * 0.0015;
+    }
+    const nf = noiseFloor[row];
+
+    // 3) Soft gate above floor
+    let signal = v - nf * 1.12;
+    if (signal < 4) signal = 0;
+    else signal = signal - 4;
+
+    return signal; // unscaled 0..~255
   }
 
   function ensureBuffers() {
@@ -173,6 +222,7 @@
     const ctx = canvas.getContext("2d", { alpha: false });
     imageData = ctx.createImageData(w, h);
     fillSpectroDark(imageData.data);
+    ensureNoiseFloor(h);
   }
 
   /** Fresh spectrogram — call on every Start / Stop so history does not carry over. */
@@ -183,6 +233,8 @@
     const ctx = el.canvas.getContext("2d", { alpha: false });
     ctx.putImageData(imageData, 0, 0);
     freqData = null;
+    if (noiseFloor) noiseFloor.fill(18);
+    displayPeak = 40;
   }
 
   function binForNorm(n, binCount) {
@@ -202,6 +254,7 @@
     const h = spectroH;
     const w = spectroW;
     const data = imageData.data;
+    ensureNoiseFloor(h);
 
     // Scroll left by 1 px
     const rowBytes = w * 4;
@@ -212,8 +265,12 @@
 
     // New column on the right from log-sampled FFT
     const x = w - 1;
+    let colPeak = 0;
+    const signals = new Float32Array(h);
+
     for (let y = 0; y < h; y++) {
       const n = yToNorm(y + 0.5, h);
+      const hz = normToHz(n);
       // Average a small neighborhood in bin space for smoothness
       const bin = binForNorm(n, bins);
       const binLo = Math.max(0, bin - 1);
@@ -224,9 +281,25 @@
         sum += freqData[b];
         count++;
       }
-      const v = sum / count;
+      const raw = sum / count / 255;
+      const sig = processDisplayLevel(raw, hz, y);
+      signals[y] = sig;
+      if (sig > colPeak) colPeak = sig;
+    }
+
+    // Auto-contrast: stretch residual signal so quiet events fill the color map
+    if (colPeak > displayPeak) displayPeak = displayPeak * 0.65 + colPeak * 0.35;
+    else displayPeak = displayPeak * 0.997 + colPeak * 0.003;
+    const peak = Math.max(22, displayPeak);
+    // Target ~peak maps near 0.85 of color scale
+    const scale = 220 / peak;
+
+    for (let y = 0; y < h; y++) {
+      let mapped = signals[y] * scale;
+      // Mild gamma so mid chirps pop without blowing peaks
+      mapped = Math.pow(Math.min(1, mapped / 255), 0.72) * 255;
       const i = (y * w + x) * 4;
-      colorMap(v, data, i);
+      colorMap(mapped, data, i);
     }
 
     const ctx = el.canvas.getContext("2d", { alpha: false });
