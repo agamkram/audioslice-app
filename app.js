@@ -253,27 +253,10 @@
       ctx.fillText(label, 6, y);
     }
 
-    // Selection highlight: band portion, or full spectrum in Full mode
-    const bandLive = engine.running;
-    const fillIdle = "rgba(61,156,245,0.10)";
-    const fillLive = "rgba(61,156,245,0.18)";
-    const fillSlide = "rgba(61,156,245,0.24)";
-    const strokeLive = "rgba(61,156,245,0.95)";
-    const strokeIdle = "rgba(61,156,245,0.55)";
-
-    if (mode === "direct") {
-      // Same highlight language as Band — full height, no yellow line / handles
-      ctx.fillStyle = bandLive ? fillLive : fillIdle;
-      ctx.fillRect(0, 0, W, H);
-      ctx.strokeStyle = bandLive ? strokeLive : strokeIdle;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(W, 0);
-      ctx.moveTo(0, H);
-      ctx.lineTo(W, H);
-      ctx.stroke();
-    } else if (mode === "band") {
+    // Selection highlight — Band and Full share the same adjustable chrome
+    // (Full starts full-range; dragging HI/LO / yellow switches listen to Band)
+    if (mode === "band" || mode === "direct") {
+      const bandLive = engine.running;
       const yHi = normToY(bandHiNorm(), H);
       const yLo = normToY(bandLoNorm(), H);
       const top = Math.min(yHi, yLo);
@@ -281,10 +264,16 @@
       const mid = (top + bot) / 2;
       const sliding = dragging === "band";
 
-      ctx.fillStyle = bandLive ? (sliding ? fillSlide : fillLive) : fillIdle;
+      ctx.fillStyle = bandLive
+        ? sliding
+          ? "rgba(61,156,245,0.24)"
+          : "rgba(61,156,245,0.18)"
+        : "rgba(61,156,245,0.10)";
       ctx.fillRect(0, top, W, bot - top);
 
-      ctx.strokeStyle = bandLive ? strokeLive : strokeIdle;
+      ctx.strokeStyle = bandLive
+        ? "rgba(61,156,245,0.95)"
+        : "rgba(61,156,245,0.55)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(0, top);
@@ -443,16 +432,25 @@
     return "band";
   }
 
+  /** Dragging Full’s range selects a band and switches listen to Band. */
+  function ensureBandListenFromFull() {
+    if (mode !== "direct") return;
+    mode = "band";
+    setToggleBtn(el.modeBand, true);
+    setToggleBtn(el.modeDirect, false);
+    engine.setMode("band");
+    engine.setMonitorEnabled(true);
+    if (el.hint) {
+      el.hint.textContent =
+        "Drag HI/LO to set range · drag yellow line / anywhere to slide the band";
+    }
+  }
+
   function onPointerDown(e) {
     if (!engine.running) return;
+    if (mode !== "band" && mode !== "direct") return;
     e.preventDefault();
     const p = canvasPoint(e);
-
-    if (mode !== "band") {
-      // Full — no spectrogram drag
-      dragging = null;
-      return;
-    }
 
     const hit = hitTestBand(p.x, p.y, p.W, p.H);
     if (hit === "hi" || hit === "lo") {
@@ -477,10 +475,12 @@
     if (dragging === "hi") {
       setBandFromNorms(bandLoNorm(), Math.max(bandLoNorm() + 0.02, n));
       setActivePreset(null);
+      ensureBandListenFromFull();
       applyBandToEngine();
     } else if (dragging === "lo") {
       setBandFromNorms(Math.min(bandHiNorm() - 0.02, n), bandHiNorm());
       setActivePreset(null);
+      ensureBandListenFromFull();
       applyBandToEngine();
     } else if (dragging === "band") {
       // Slide in log-norm space from the Hz snapshot at pointer-down
@@ -499,6 +499,7 @@
       }
       setBandFromNorms(Math.max(0.02, lo), Math.min(0.98, hi));
       setActivePreset(null);
+      ensureBandListenFromFull();
       applyBandToEngine();
     }
   }
@@ -643,13 +644,19 @@
     mode = m;
     setToggleBtn(el.modeBand, m === "band");
     setToggleBtn(el.modeDirect, m === "direct");
-    if (m === "direct") setActivePreset(null);
+    if (m === "direct") {
+      // Full = entire spectrum as an adjustable band (unfiltered until you drag)
+      setActivePreset(null);
+      setBandFromNorms(0.02, 0.98);
+      updateReadouts();
+    }
     if (!engine.running) return;
     engine.resume();
     engine.setMonitorEnabled(true);
     engine.setMode(m);
     if (m === "direct") {
-      el.hint.textContent = "Full unfiltered mic in headphones";
+      el.hint.textContent =
+        "Full unfiltered · drag HI/LO or yellow line to isolate a band";
     } else {
       el.hint.textContent =
         "Drag HI/LO to set range · drag yellow center line / anywhere to slide the band";
