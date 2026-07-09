@@ -75,6 +75,14 @@
 
     function syncFitStageViewport() {
       if (!ensureElements()) return;
+      // Phone fluid: app owns stage via pinPhoneFill (edge-anchored fill).
+      // Do not write short visualViewport heights that lift the bottom card.
+      if (
+        isPhoneLayout(root.innerWidth) &&
+        stage.classList.contains("fit-stage--fluid")
+      ) {
+        return;
+      }
       const vv = root.visualViewport;
       if (!vv || !isPhoneLayout(root.innerWidth)) {
         stage.style.top = "";

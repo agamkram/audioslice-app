@@ -839,23 +839,31 @@
       if (el.app) el.app.classList.add("is-fitted");
     }
 
+    /**
+     * Phone: pin stage to all four edges (not a measured height).
+     * Setting height: Npx from innerHeight is what raised the bottom card —
+     * a short reading shrinks the stage, flex shrinks the graph, controls sit high.
+     * top/right/bottom/left: 0 always fills the screen; graph gets leftover height.
+     */
     function pinPhoneFill() {
-      // Phone only: fill the visible area. Guard against 0-size (PWA cold start).
       const isPhone = window.innerWidth <= 767;
       const stage = el.stage;
       const app = el.app;
       if (!stage || !app) return;
       if (!isPhone) {
+        stage.classList.remove("fit-stage--fluid");
         stage.style.top = "";
         stage.style.left = "";
-        stage.style.width = "";
-        stage.style.height = "";
         stage.style.right = "";
         stage.style.bottom = "";
+        stage.style.width = "";
+        stage.style.height = "";
+        stage.style.position = "";
         app.style.height = "";
         app.style.width = "";
         app.style.maxHeight = "";
         app.style.maxWidth = "";
+        app.style.transform = "";
         return;
       }
 
@@ -864,29 +872,27 @@
         window.matchMedia("(display-mode: standalone)").matches ||
         window.navigator.standalone === true;
 
-      let w = Math.round(window.innerWidth) || 390;
-      let h = Math.round(window.innerHeight) || 700;
-      let top = 0;
-      let left = 0;
-
-      if (!standalone && vv && vv.height > 40) {
-        w = Math.round(vv.width) || w;
-        h = Math.round(vv.height) || h;
-        top = Math.round(vv.offsetTop) || 0;
-        left = Math.round(vv.offsetLeft) || 0;
-      }
-      // Never pin a collapsed stage (blank PWA)
-      if (w < 200) w = Math.round(window.innerWidth) || 390;
-      if (h < 200) h = Math.round(window.innerHeight) || 700;
-
       stage.classList.add("fit-stage--fluid");
       stage.style.position = "fixed";
-      stage.style.top = `${top}px`;
-      stage.style.left = `${left}px`;
-      stage.style.right = "auto";
-      stage.style.bottom = "auto";
-      stage.style.width = `${w}px`;
-      stage.style.height = `${h}px`;
+      // Clear pixel size so left/right + top/bottom define the box
+      stage.style.width = "";
+      stage.style.height = "";
+
+      if (!standalone && vv && vv.height > 40 && vv.width > 40) {
+        // Safari tab: visible area only (URL bar)
+        stage.style.top = `${Math.round(vv.offsetTop) || 0}px`;
+        stage.style.left = `${Math.round(vv.offsetLeft) || 0}px`;
+        stage.style.width = `${Math.round(vv.width)}px`;
+        stage.style.height = `${Math.round(vv.height)}px`;
+        stage.style.right = "auto";
+        stage.style.bottom = "auto";
+      } else {
+        // PWA / full phone: stretch to every edge — bottom card on the floor
+        stage.style.top = "0";
+        stage.style.left = "0";
+        stage.style.right = "0";
+        stage.style.bottom = "0";
+      }
 
       app.style.transform = "none";
       app.style.width = "100%";
@@ -911,9 +917,10 @@
         drawOverlay();
       },
     });
-    fit.bindViewportListeners();
+    // Phone fluid stage not rewritten by fit-to-screen's visualViewport sizes
+    fit.bindViewportListeners({ bindOrientation: false });
 
-    // Always show UI quickly — never leave home-screen icon opening to blank
+    // Open: edge-fill once (no height number that can be short)
     pinPhoneFill();
     showApp();
     ensureBuffers();
@@ -931,21 +938,13 @@
         showApp();
       });
 
-    // Failsafe if fonts/viewport settle hangs
-    setTimeout(() => {
-      pinPhoneFill();
-      showApp();
-      ensureBuffers();
-      drawOverlay();
-    }, 800);
-
+    // Desktop/iPad only re-pin on resize. Phone stays edge-anchored (no rotate thrash).
     window.addEventListener("resize", () => {
-      pinPhoneFill();
-      ensureBuffers();
-    });
-    window.visualViewport?.addEventListener("resize", () => {
-      pinPhoneFill();
-      ensureBuffers();
+      if (window.innerWidth > 767) {
+        pinPhoneFill();
+        ensureBuffers();
+        drawOverlay();
+      }
     });
 
     window.addEventListener("pagehide", () => {

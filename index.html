@@ -460,16 +460,22 @@
       border: 2px solid #e8edf4;
     }
 
-    /* Phone only — fill visible area; spectrogram takes leftover space */
+    /* Phone: stage fills the screen; graph flexes; controls stay on the floor */
     @media (max-width: 767px) {
-      .fit-stage {
+      .fit-stage,
+      .fit-stage.fit-stage--fluid {
+        position: fixed;
+        inset: 0;
         align-items: stretch;
         justify-content: stretch;
+        /* Prefer edge stretch over a brittle 100dvh that can undershoot in PWA */
+        width: auto;
+        height: auto;
         padding:
-          max(0.12rem, env(safe-area-inset-top))
-          max(0.3rem, env(safe-area-inset-right))
-          max(0.12rem, env(safe-area-inset-bottom))
-          max(0.3rem, env(safe-area-inset-left));
+          max(0.12rem, env(safe-area-inset-top, 0px))
+          max(0.3rem, env(safe-area-inset-right, 0px))
+          max(0.12rem, env(safe-area-inset-bottom, 0px))
+          max(0.3rem, env(safe-area-inset-left, 0px));
       }
 
       .app {
@@ -592,9 +598,9 @@
     </div>
   </div>
 
-  <script src="fit-to-screen.js?v=109"></script>
-  <script src="audio-engine.js?v=109"></script>
-  <script src="app.js?v=109"></script>
+  <script src="fit-to-screen.js?v=117"></script>
+  <script src="audio-engine.js?v=117"></script>
+  <script src="app.js?v=117"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
