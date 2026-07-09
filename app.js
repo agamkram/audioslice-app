@@ -143,8 +143,18 @@
     out[i + 3] = 255;
   }
 
+  function fillSpectroDark(data) {
+    for (let i = 0; i < data.length; i += 4) {
+      data[i] = 8;
+      data[i + 1] = 12;
+      data[i + 2] = 20;
+      data[i + 3] = 255;
+    }
+  }
+
   function ensureBuffers() {
     const canvas = el.canvas;
+    if (!canvas) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cssW = canvas.clientWidth;
     const cssH = canvas.clientHeight;
@@ -158,14 +168,17 @@
     canvas.height = h;
     const ctx = canvas.getContext("2d", { alpha: false });
     imageData = ctx.createImageData(w, h);
-    // Fill dark
-    const d = imageData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = 8;
-      d[i + 1] = 12;
-      d[i + 2] = 20;
-      d[i + 3] = 255;
-    }
+    fillSpectroDark(imageData.data);
+  }
+
+  /** Fresh spectrogram — call on every Start / Stop so history does not carry over. */
+  function resetSpectrogram() {
+    ensureBuffers();
+    if (!el.canvas || !imageData) return;
+    fillSpectroDark(imageData.data);
+    const ctx = el.canvas.getContext("2d", { alpha: false });
+    ctx.putImageData(imageData, 0, 0);
+    freqData = null;
   }
 
   function binForNorm(n, binCount) {
@@ -541,7 +554,7 @@
       setControlsLive(true);
 
       runningVisual = true;
-      ensureBuffers();
+      resetSpectrogram();
       drawOverlay();
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(tick);
@@ -569,13 +582,7 @@
     el.gainSlider.disabled = true;
     setControlsLive(false);
     resetBandTo420();
-    // Clear canvas
-    if (el.canvas) {
-      const ctx = el.canvas.getContext("2d");
-      ctx.fillStyle = "#080c14";
-      ctx.fillRect(0, 0, el.canvas.width, el.canvas.height);
-    }
-    ensureBuffers();
+    resetSpectrogram();
     drawOverlay();
   }
 
