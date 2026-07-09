@@ -38,8 +38,101 @@
       this._savedMonitorGain = 1.4;
       this._rumbleOn = false;
       this._deHissOn = false;
+      this._constraintTimers = [];
       this.sampleRate = 48000;
       this.nyquist = 24000;
+    }
+
+    /** Prefer raw mic — browsers (esp. Chrome/Mac) love voice processing. */
+    _micConstraints(strict) {
+      const off = strict
+        ? { exact: false }
+        : false;
+      return {
+        echoCancellation: off,
+        noiseSuppression: off,
+        autoGainControl: off,
+        channelCount: { ideal: 1 },
+        // Discourage speech-mode DSP where supported (Safari 17+ / some Chromium)
+        voiceIsolation: off,
+      };
+    }
+
+    async _openMic() {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: this._micConstraints(true),
+          video: false,
+        });
+      } catch (_) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: this._micConstraints(false),
+          video: false,
+        });
+      }
+      const track = stream.getAudioTracks()[0];
+      if (track) {
+        try {
+          // "music" steers Chrome/Safari away from voice AGC/NS tuning
+          if ("contentHint" in track) track.contentHint = "music";
+        } catch (_) {}
+        await this._assertRawMic(track);
+      }
+      return stream;
+    }
+
+    async _assertRawMic(track) {
+      if (!track) return;
+      const soft = {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      };
+      try {
+        await track.applyConstraints({
+          echoCancellation: { exact: false },
+          noiseSuppression: { exact: false },
+          autoGainControl: { exact: false },
+        });
+      } catch (_) {
+        try {
+          await track.applyConstraints(soft);
+        } catch (_) {}
+      }
+      try {
+        if ("contentHint" in track) track.contentHint = "music";
+      } catch (_) {}
+      // Debug: if Mac tone still shifts, check whether these flip true after a few seconds
+      try {
+        const s = track.getSettings?.() || {};
+        console.info("[AudioSlice] mic settings", {
+          echoCancellation: s.echoCancellation,
+          noiseSuppression: s.noiseSuppression,
+          autoGainControl: s.autoGainControl,
+          sampleRate: s.sampleRate,
+          channelCount: s.channelCount,
+          contentHint: track.contentHint,
+        });
+      } catch (_) {}
+    }
+
+    _scheduleMicReassert() {
+      this._clearConstraintTimers();
+      // Chrome/macOS sometimes re-engages voice DSP a few seconds in — push back
+      for (const ms of [500, 1500, 3000, 5000]) {
+        const id = setTimeout(() => {
+          const track = this.stream?.getAudioTracks?.()[0];
+          if (!track || track.readyState !== "live") return;
+          this._assertRawMic(track);
+        }, ms);
+        this._constraintTimers.push(id);
+      }
+    }
+
+    _clearConstraintTimers() {
+      for (const id of this._constraintTimers) clearTimeout(id);
+      this._constraintTimers = [];
     }
 
     get isRunning() {
@@ -69,22 +162,7 @@
     async start() {
       if (this.running) return;
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          channelCount: 1,
-        },
-        video: false,
-      });
-      try {
-        await stream.getAudioTracks()[0]?.applyConstraints({
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        });
-      } catch (_) {}
+      const stream = await this._openMic();
 
       const Ctx = root.AudioContext || root.webkitAudioContext;
       const ctx = new Ctx({ latencyHint: "interactive" });
@@ -110,18 +188,26 @@
       const effectSlot = ctx.createGain();
       effectSlot.gain.value = 1;
 
+      // Biquad defaults to 350 Hz — set target band immediately so first audio isn't wrong
+      const lo0 = this.bandLowHz;
+      const hi0 = this.bandHighHz;
+
       const bandHigh = ctx.createBiquadFilter();
       bandHigh.type = "highpass";
       bandHigh.Q.value = DEFAULT_BAND_Q;
+      bandHigh.frequency.value = lo0;
       const bandHigh2 = ctx.createBiquadFilter();
       bandHigh2.type = "highpass";
       bandHigh2.Q.value = DEFAULT_BAND_Q;
+      bandHigh2.frequency.value = lo0;
       const bandLow = ctx.createBiquadFilter();
       bandLow.type = "lowpass";
       bandLow.Q.value = DEFAULT_BAND_Q;
+      bandLow.frequency.value = hi0;
       const bandLow2 = ctx.createBiquadFilter();
       bandLow2.type = "lowpass";
       bandLow2.Q.value = DEFAULT_BAND_Q;
+      bandLow2.frequency.value = hi0;
 
       const bandGate = ctx.createGain();
       bandGate.gain.value = 0;
@@ -132,12 +218,12 @@
       const rumbleFilter = ctx.createBiquadFilter();
       rumbleFilter.type = "highpass";
       rumbleFilter.Q.value = 0.7;
-      rumbleFilter.frequency.value = 20;
+      rumbleFilter.frequency.value = this._rumbleOn ? 90 : 20;
 
       const deHissFilter = ctx.createBiquadFilter();
       deHissFilter.type = "highshelf";
       deHissFilter.frequency.value = 5500;
-      deHissFilter.gain.value = 0;
+      deHissFilter.gain.value = this._deHissOn ? -12 : 0;
 
       const monitorGain = ctx.createGain();
       monitorGain.gain.value = 0;
@@ -182,15 +268,18 @@
       this.stereoOut = stereoOut;
       this.running = true;
 
-      this._applyBand();
-      this._applyRumble();
-      this._applyDeHiss();
-      this._routeMode();
+      // Instant (not ramped) so first samples match the UI band
+      this._applyBand(true);
+      this._applyRumble(true);
+      this._applyDeHiss(true);
+      this._routeMode(true);
+      this._scheduleMicReassert();
       requestAnimationFrame(() => this.resume());
     }
 
     stop() {
       if (!this.running) return;
+      this._clearConstraintTimers();
       try {
         this.source?.disconnect();
       } catch (_) {}
@@ -242,18 +331,22 @@
       this._applyDeHiss();
     }
 
-    _applyRumble() {
+    _applyRumble(immediate) {
       if (!this.rumbleFilter || !this.ctx) return;
       // On: cut sub/rumble; off: pass essentially everything
       const hz = this._rumbleOn ? 90 : 20;
-      this.rumbleFilter.frequency.setTargetAtTime(hz, this.ctx.currentTime, 0.02);
+      const t = this.ctx.currentTime;
+      if (immediate) this.rumbleFilter.frequency.setValueAtTime(hz, t);
+      else this.rumbleFilter.frequency.setTargetAtTime(hz, t, 0.02);
     }
 
-    _applyDeHiss() {
+    _applyDeHiss(immediate) {
       if (!this.deHissFilter || !this.ctx) return;
       // On: gentle high-shelf cut (hiss); off: flat
       const g = this._deHissOn ? -12 : 0;
-      this.deHissFilter.gain.setTargetAtTime(g, this.ctx.currentTime, 0.02);
+      const t = this.ctx.currentTime;
+      if (immediate) this.deHissFilter.gain.setValueAtTime(g, t);
+      else this.deHissFilter.gain.setTargetAtTime(g, t, 0.02);
     }
 
     setMonitorEnabled(on) {
@@ -311,36 +404,43 @@
       return this.mode === "band" || this.mode === "direct";
     }
 
-    _applyBand() {
+    _applyBand(immediate) {
       if (!this.bandHigh || !this.ctx) return;
       const t = this.ctx.currentTime;
       const lo = this.bandLowHz;
       const hi = this.bandHighHz;
       for (const n of [this.bandHigh, this.bandHigh2]) {
-        n.frequency.setTargetAtTime(lo, t, 0.012);
+        if (immediate) n.frequency.setValueAtTime(lo, t);
+        else n.frequency.setTargetAtTime(lo, t, 0.012);
       }
       for (const n of [this.bandLow, this.bandLow2]) {
-        n.frequency.setTargetAtTime(hi, t, 0.012);
+        if (immediate) n.frequency.setValueAtTime(hi, t);
+        else n.frequency.setTargetAtTime(hi, t, 0.012);
       }
     }
 
-    _setGate(gate, open) {
+    _setGate(gate, open, immediate) {
       if (!gate || !this.ctx) return;
-      gate.gain.setTargetAtTime(open ? 1 : 0, this.ctx.currentTime, 0.008);
+      const v = open ? 1 : 0;
+      const t = this.ctx.currentTime;
+      if (immediate) gate.gain.setValueAtTime(v, t);
+      else gate.gain.setTargetAtTime(v, t, 0.008);
     }
 
-    _routeMode() {
+    _routeMode(immediate) {
       if (!this.running || !this.monitorGain) return;
 
       const useBand = this._monitorOn && this.mode === "band";
       const useDirect = this._monitorOn && this.mode === "direct";
 
-      this._setGate(this.bandGate, useBand);
-      this._setGate(this.directGate, useDirect);
+      this._setGate(this.bandGate, useBand, immediate);
+      this._setGate(this.directGate, useDirect, immediate);
 
       const hear = useBand || useDirect;
       const g = hear ? this._savedMonitorGain : 0;
-      this.monitorGain.gain.setTargetAtTime(g, this.ctx.currentTime, 0.012);
+      const t = this.ctx.currentTime;
+      if (immediate) this.monitorGain.gain.setValueAtTime(g, t);
+      else this.monitorGain.gain.setTargetAtTime(g, t, 0.012);
     }
   }
 
