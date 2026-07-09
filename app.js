@@ -376,6 +376,13 @@
     engine.setBand(bandLoHz, bandHiHz);
   }
 
+  /** Always return to 420 Hz focus (210–840 Hz), clear preset highlight. */
+  function resetBandTo420() {
+    setBandHz(DEFAULT_BAND_LO_HZ, DEFAULT_BAND_HI_HZ);
+    setActivePreset(null);
+    updateReadouts();
+  }
+
   // —— Pointer interaction ——
   function canvasPoint(e) {
     const rect = el.overlay.getBoundingClientRect();
@@ -495,7 +502,7 @@
       el.startBtn.disabled = true;
       await engine.start();
       await engine.resume();
-      // Keep mode / preset / process choices made before Start
+      resetBandTo420();
       applyBandToEngine();
       engine.setMonitorGain(Number(el.gainSlider.value));
       if (mode !== "band" && mode !== "direct") mode = "band";
@@ -546,6 +553,7 @@
     el.hint.textContent = "Wired headphones on. Start mic to isolate spectrum";
     el.gainSlider.disabled = true;
     setControlsLive(false);
+    resetBandTo420();
     // Clear canvas
     if (el.canvas) {
       const ctx = el.canvas.getContext("2d");
