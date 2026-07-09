@@ -793,9 +793,20 @@
       setMode("direct");
     });
 
+    el.gainSlider.addEventListener("pointerdown", () => {
+      gainScrubbing = true;
+      gainScrubFrame = 0;
+    });
+    const endGainScrub = () => {
+      gainScrubbing = false;
+    };
+    el.gainSlider.addEventListener("pointerup", endGainScrub);
+    el.gainSlider.addEventListener("pointercancel", endGainScrub);
+    el.gainSlider.addEventListener("change", endGainScrub);
     el.gainSlider.addEventListener("input", () => {
       if (!engine.running) return;
-      engine.resume();
+      // Avoid async resume() on every tick — only if suspended
+      if (engine.contextState === "suspended") engine.resume();
       engine.setMonitorGain(Number(el.gainSlider.value));
     });
 
