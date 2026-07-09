@@ -262,11 +262,17 @@
     const strokeIdle = "rgba(61,156,245,0.55)";
 
     if (mode === "direct") {
+      // Same highlight language as Band — full height, no yellow line / handles
       ctx.fillStyle = bandLive ? fillLive : fillIdle;
       ctx.fillRect(0, 0, W, H);
       ctx.strokeStyle = bandLive ? strokeLive : strokeIdle;
       ctx.lineWidth = 2;
-      ctx.strokeRect(1, 1, W - 2, H - 2);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(W, 0);
+      ctx.moveTo(0, H);
+      ctx.lineTo(W, H);
+      ctx.stroke();
     } else if (mode === "band") {
       const yHi = normToY(bandHiNorm(), H);
       const yLo = normToY(bandLoNorm(), H);
