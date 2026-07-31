@@ -596,12 +596,14 @@
       }
 
       html.pwa-standalone .app {
-        padding-bottom: 0;
+        /* Lift whole UI stack above home indicator / screen curve (not pad inside card) */
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.125in);
       }
 
-      /* Home-indicator pad + 1/16" so card corners clear the screen curve */
       html.pwa-standalone .app > .controls {
-        padding-bottom: calc(max(0.35rem, env(safe-area-inset-bottom, 0px)) + 0.0625in);
+        /* Keep internal card padding; do not fake lift with padding-bottom on the card */
+        padding: 0.36rem;
+        margin-bottom: 0;
       }
     }
   
@@ -670,9 +672,9 @@
     </div>
   </div>
 
-  <script src="fit-to-screen.js?v=pwa2"></script>
-  <script src="audio-engine.js?v=pwa2"></script>
-  <script src="app.js?v=pwa2"></script>
+  <script src="fit-to-screen.js?v=pwa3"></script>
+  <script src="audio-engine.js?v=pwa3"></script>
+  <script src="app.js?v=pwa3"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
