@@ -926,13 +926,14 @@
         root.classList.add("pwa-standalone");
         root.style.setProperty("--pwa-fill-h", `${fillH}px`);
         root.style.setProperty("--pwa-extra-b", `${extra}px`);
-        // Let CSS own geometry (no short inline that fights fillH)
-        stage.style.top = "";
-        stage.style.left = "";
-        stage.style.right = "";
-        stage.style.bottom = "";
-        stage.style.width = "";
-        stage.style.height = "";
+        // Explicit fill so bg covers full screen (not short inset:0 / 100dvh)
+        stage.style.top = "0";
+        stage.style.left = "0";
+        stage.style.right = "0";
+        stage.style.bottom = "auto";
+        stage.style.width = "100%";
+        stage.style.height = `calc(var(--pwa-fill-h) + var(--pwa-extra-b, 0px))`;
+        stage.style.backgroundColor = getComputedStyle(root).getPropertyValue("--bg").trim() || "#0a0e14";
       } else {
         root.classList.remove("pwa-standalone");
         root.style.removeProperty("--pwa-fill-h");
