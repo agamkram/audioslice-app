@@ -599,9 +599,9 @@
         padding-bottom: 0;
       }
 
-      /* Single home-indicator pad on bottom controls (not empty stage gap) */
+      /* Home-indicator pad + 1/16" so card corners clear the screen curve */
       html.pwa-standalone .app > .controls {
-        padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
+        padding-bottom: calc(max(0.35rem, env(safe-area-inset-bottom, 0px)) + 0.0625in);
       }
     }
   
@@ -670,9 +670,9 @@
     </div>
   </div>
 
-  <script src="fit-to-screen.js?v=pwa1"></script>
-  <script src="audio-engine.js?v=pwa1"></script>
-  <script src="app.js?v=pwa1"></script>
+  <script src="fit-to-screen.js?v=pwa2"></script>
+  <script src="audio-engine.js?v=pwa2"></script>
+  <script src="app.js?v=pwa2"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
