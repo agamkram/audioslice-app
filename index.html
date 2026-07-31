@@ -201,18 +201,24 @@
     header.top {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-end;
       gap: 0.5rem;
       min-height: 2.1rem;
+      position: relative;
     }
 
     .brand {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
       min-width: 0;
+      text-align: center;
+      pointer-events: none;
     }
 
     .brand h1 {
       font-family: "Michroma", system-ui, sans-serif;
-      font-size: var(--text-title);
+      font-size: calc(var(--text-title) + 1px);
       font-weight: 400;
       letter-spacing: 0.02em;
       line-height: 1.1;
@@ -698,9 +704,9 @@
     </div>
   </div>
 
-  <script src="fit-to-screen.js?v=pwa5"></script>
-  <script src="audio-engine.js?v=pwa5"></script>
-  <script src="app.js?v=pwa5"></script>
+  <script src="fit-to-screen.js?v=pwa6"></script>
+  <script src="audio-engine.js?v=pwa6"></script>
+  <script src="app.js?v=pwa6"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
