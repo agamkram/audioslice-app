@@ -862,19 +862,34 @@
       if (el.app) el.app.classList.add("is-fitted");
     }
 
+    function isStandaloneDisplay() {
+      try {
+        if (window.navigator.standalone === true) return true;
+        return (
+          window.matchMedia("(display-mode: standalone)").matches ||
+          window.matchMedia("(display-mode: fullscreen)").matches ||
+          window.matchMedia("(display-mode: minimal-ui)").matches
+        );
+      } catch (_) {
+        return window.navigator.standalone === true;
+      }
+    }
+
     /**
-     * Phone: pin stage to all four edges (not a measured height).
-     * Setting height: Npx from innerHeight is what raised the bottom card —
-     * a short reading shrinks the stage, flex shrinks the graph, controls sit high.
-     * top/right/bottom/left: 0 always fills the screen; graph gets leftover height.
+     * Phone: Safari = visualViewport. PWA = screen fillH (Desktop bleed Bug B).
+     * Graph flexes into leftover height; controls get env(safe-area) pad only.
      */
     function pinPhoneFill() {
       const isPhone = window.innerWidth <= 767;
       const stage = el.stage;
       const app = el.app;
+      const root = document.documentElement;
       if (!stage || !app) return;
       if (!isPhone) {
         stage.classList.remove("fit-stage--fluid");
+        root.classList.remove("pwa-standalone");
+        root.style.removeProperty("--pwa-fill-h");
+        root.style.removeProperty("--pwa-extra-b");
         stage.style.top = "";
         stage.style.left = "";
         stage.style.right = "";
@@ -891,30 +906,53 @@
       }
 
       const vv = window.visualViewport;
-      const standalone =
-        window.matchMedia("(display-mode: standalone)").matches ||
-        window.navigator.standalone === true;
+      const standalone = isStandaloneDisplay();
 
       stage.classList.add("fit-stage--fluid");
       stage.style.position = "fixed";
-      // Clear pixel size so left/right + top/bottom define the box
-      stage.style.width = "";
-      stage.style.height = "";
 
-      if (!standalone && vv && vv.height > 40 && vv.width > 40) {
-        // Safari tab: visible area only (URL bar)
-        stage.style.top = `${Math.round(vv.offsetTop) || 0}px`;
-        stage.style.left = `${Math.round(vv.offsetLeft) || 0}px`;
-        stage.style.width = `${Math.round(vv.width)}px`;
-        stage.style.height = `${Math.round(vv.height)}px`;
-        stage.style.right = "auto";
-        stage.style.bottom = "auto";
+      if (standalone) {
+        // Full device height so bg reaches notch; not short layout/100dvh.
+        const iw = window.innerWidth || 0;
+        const ih = window.innerHeight || 0;
+        const sw = window.screen?.width || 0;
+        const sh = window.screen?.height || 0;
+        const screenMax = Math.max(sw, sh);
+        const screenMin = Math.min(sw, sh);
+        const fillH =
+          ih >= iw ? Math.max(ih, screenMax) : Math.max(ih, screenMin);
+        let extra = 0;
+        if (Math.min(iw, ih) >= 600 && screenMax < ih - 10) extra = 20;
+        root.classList.add("pwa-standalone");
+        root.style.setProperty("--pwa-fill-h", `${fillH}px`);
+        root.style.setProperty("--pwa-extra-b", `${extra}px`);
+        // Let CSS own geometry (no short inline that fights fillH)
+        stage.style.top = "";
+        stage.style.left = "";
+        stage.style.right = "";
+        stage.style.bottom = "";
+        stage.style.width = "";
+        stage.style.height = "";
       } else {
-        // PWA / full phone: stretch to every edge — bottom card on the floor
-        stage.style.top = "0";
-        stage.style.left = "0";
-        stage.style.right = "0";
-        stage.style.bottom = "0";
+        root.classList.remove("pwa-standalone");
+        root.style.removeProperty("--pwa-fill-h");
+        root.style.removeProperty("--pwa-extra-b");
+        stage.style.width = "";
+        stage.style.height = "";
+        if (vv && vv.height > 40 && vv.width > 40) {
+          // Safari tab: visible area only (URL bar)
+          stage.style.top = `${Math.round(vv.offsetTop) || 0}px`;
+          stage.style.left = `${Math.round(vv.offsetLeft) || 0}px`;
+          stage.style.width = `${Math.round(vv.width)}px`;
+          stage.style.height = `${Math.round(vv.height)}px`;
+          stage.style.right = "auto";
+          stage.style.bottom = "auto";
+        } else {
+          stage.style.top = "0";
+          stage.style.left = "0";
+          stage.style.right = "0";
+          stage.style.bottom = "0";
+        }
       }
 
       app.style.transform = "none";

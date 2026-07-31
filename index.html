@@ -26,6 +26,34 @@
   <meta name="twitter:description" content="Live microphone spectrum analyzer. Select a frequency band and hear only that range through headphones." />
   <meta name="twitter:image" content="https://audioslice.markmaga.com/icon-512.png" />
   <title>AudioSlice</title>
+  <!-- PWA Bug B (Desktop Bottom:full bleed): fill screen height before paint; bg under notch. -->
+  <script>
+    (function () {
+      try {
+        var r = document.documentElement;
+        var n = window.navigator;
+        var standalone =
+          n.standalone === true ||
+          (window.matchMedia &&
+            (window.matchMedia("(display-mode: standalone)").matches ||
+              window.matchMedia("(display-mode: fullscreen)").matches ||
+              window.matchMedia("(display-mode: minimal-ui)").matches));
+        if (!standalone) return;
+        r.classList.add("pwa-standalone");
+        var iw = window.innerWidth || 0;
+        var ih = window.innerHeight || 0;
+        var sw = (window.screen && window.screen.width) || 0;
+        var sh = (window.screen && window.screen.height) || 0;
+        var screenMax = Math.max(sw, sh);
+        var screenMin = Math.min(sw, sh);
+        var fillH = ih >= iw ? Math.max(ih, screenMax) : Math.max(ih, screenMin);
+        var extra = 0;
+        if (Math.min(iw, ih) >= 600 && screenMax < ih - 10) extra = 20;
+        r.style.setProperty("--pwa-fill-h", fillH + "px");
+        r.style.setProperty("--pwa-extra-b", extra + "px");
+      } catch (e) {}
+    })();
+  </script>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" type="image/png" href="icon-192.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -53,6 +81,8 @@
       --text-ui: clamp(0.62rem, 1.55vmin, 0.72rem);
       --text-value: clamp(0.85rem, 2.2vmin, 1.05rem);
       --text-label: clamp(0.55rem, 1.35vmin, 0.65rem);
+      --pwa-fill-h: 100%;
+      --pwa-extra-b: 0px;
     }
 
     * {
@@ -83,6 +113,15 @@
       user-select: none;
     }
 
+    /* PWA: full screen height so bg reaches notch + home-indicator edge */
+    html.pwa-standalone,
+    html.pwa-standalone body {
+      height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
+      min-height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
+      max-height: none;
+      background: var(--bg);
+    }
+
     .fit-stage {
       position: fixed;
       inset: 0;
@@ -93,6 +132,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      background: var(--bg);
       padding:
         max(0.2rem, env(safe-area-inset-top))
         max(0.35rem, env(safe-area-inset-right))
@@ -537,19 +577,31 @@
       }
     }
 
-    @media (max-width: 767px) and (display-mode: standalone) {
-      .fit-stage {
-        /* keep home-indicator clearance on the stage, not inside the card */
-        padding-bottom: max(0.2rem, env(safe-area-inset-bottom));
+    /* PWA phone: fillH stack (Desktop bleed Bug B). Safari tab CSS unchanged above. */
+    @media (max-width: 767px) {
+      html.pwa-standalone .fit-stage,
+      html.pwa-standalone .fit-stage.fit-stage--fluid {
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: auto;
+        width: 100%;
+        height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
+        /* bg under notch; pad content only */
+        padding-top: max(0.12rem, env(safe-area-inset-top, 0px));
+        padding-right: max(0.3rem, env(safe-area-inset-right, 0px));
+        padding-left: max(0.3rem, env(safe-area-inset-left, 0px));
+        padding-bottom: 0;
+        background: var(--bg);
       }
 
-      .app {
-        padding-bottom: 0.1rem;
+      html.pwa-standalone .app {
+        padding-bottom: 0;
       }
 
-      /* Only change: less empty pad under the gain slider inside the card */
-      .app > .controls {
-        padding-bottom: 0.2rem;
+      /* Single home-indicator pad on bottom controls (not empty stage gap) */
+      html.pwa-standalone .app > .controls {
+        padding-bottom: max(0.35rem, env(safe-area-inset-bottom, 0px));
       }
     }
   
@@ -618,9 +670,9 @@
     </div>
   </div>
 
-  <script src="fit-to-screen.js?v=121"></script>
-  <script src="audio-engine.js?v=121"></script>
-  <script src="app.js?v=121"></script>
+  <script src="fit-to-screen.js?v=pwa1"></script>
+  <script src="audio-engine.js?v=pwa1"></script>
+  <script src="app.js?v=pwa1"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
