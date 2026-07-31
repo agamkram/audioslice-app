@@ -114,6 +114,10 @@
     }
 
     /* PWA: full screen height so bg reaches notch + home-indicator edge */
+    html.pwa-standalone {
+      background: #121a28 !important; /* match app gradient apex under notch */
+      background-color: #121a28 !important;
+    }
     html.pwa-standalone,
     html.pwa-standalone body {
       height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px)) !important;
@@ -132,7 +136,7 @@
       right: 0;
       width: 100%;
       height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px));
-      background: var(--bg);
+      background: radial-gradient(120% 80% at 50% 0%, #121a28 0%, #0a0e14 55%);
       z-index: -1;
       pointer-events: none;
     }
@@ -606,18 +610,21 @@
         height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px)) !important;
         min-height: calc(var(--pwa-fill-h, 100%) + var(--pwa-extra-b, 0px)) !important;
         max-height: none !important;
-        /* Content inset only; stage bg still paints full fillH (under notch) */
-        padding-top: max(0.12rem, env(safe-area-inset-top, 0px)) !important;
-        padding-right: max(0.3rem, env(safe-area-inset-right, 0px)) !important;
-        padding-left: max(0.3rem, env(safe-area-inset-left, 0px)) !important;
-        padding-bottom: 0 !important;
+        /* No stage pad-top — that made a solid strip above the app gradient (sharp line). */
+        padding: 0 !important;
         background: var(--bg) !important;
         background-color: var(--bg) !important;
       }
 
       html.pwa-standalone .app {
-        /* safe-area + 1/16" so card corners clear (was 1/8"; lowered 1/16") */
+        /* Safe-area lives on .app so its gradient paints continuously under the notch */
+        padding-top: max(0.28rem, env(safe-area-inset-top, 0px)) !important;
+        padding-right: max(0.38rem, env(safe-area-inset-right, 0px)) !important;
+        padding-left: max(0.38rem, env(safe-area-inset-left, 0px)) !important;
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.0625in) !important;
+        border-radius: 0 !important;
+        /* Same radial as base .app — ensure full-bleed under status bar */
+        background: radial-gradient(120% 80% at 50% 0%, #121a28 0%, var(--bg) 55%) !important;
       }
 
       html.pwa-standalone .app > .controls {
@@ -691,9 +698,9 @@
     </div>
   </div>
 
-  <script src="fit-to-screen.js?v=pwa4"></script>
-  <script src="audio-engine.js?v=pwa4"></script>
-  <script src="app.js?v=pwa4"></script>
+  <script src="fit-to-screen.js?v=pwa5"></script>
+  <script src="audio-engine.js?v=pwa5"></script>
+  <script src="app.js?v=pwa5"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
